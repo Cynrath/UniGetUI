@@ -567,6 +567,7 @@ public class AgentPolicyInspectorViewModelTests
         Assert.Equal("Writable", viewModel.AgentWriteCapabilityText);
         Assert.Equal("Available", viewModel.PolicyChangesFromThisAppText);
         Assert.Equal("Not applicable", viewModel.PolicyChangesReasonText);
+        Assert.False(viewModel.HasPolicyChangesReason);
     }
 
     [Theory]
@@ -626,6 +627,7 @@ public class AgentPolicyInspectorViewModelTests
         Assert.Equal("Unavailable", viewModel.PolicyChangesFromThisAppText);
         Assert.Contains(expectedReason, viewModel.PolicyChangesReasonText);
         Assert.Contains("all users", viewModel.PolicyChangesReasonText);
+        Assert.True(viewModel.HasPolicyChangesReason);
         Assert.False(viewModel.CanEdit);
         Assert.False(viewModel.CanCreate);
         Assert.False(viewModel.CanRepair);
@@ -681,6 +683,7 @@ public class AgentPolicyInspectorViewModelTests
         Assert.Equal("Unavailable", viewModel.PolicyChangesFromThisAppText);
         Assert.Equal(expectedReason, viewModel.PolicyChangesReasonText);
         Assert.DoesNotContain("helper", viewModel.PolicyChangesReasonText, StringComparison.OrdinalIgnoreCase);
+        Assert.True(viewModel.HasPolicyChangesReason);
     }
 
     [Fact]
@@ -702,6 +705,7 @@ public class AgentPolicyInspectorViewModelTests
         Assert.Equal("Writable", viewModel.AgentWriteCapabilityText);
         Assert.Equal("Available", viewModel.PolicyChangesFromThisAppText);
         Assert.Equal("Not applicable", viewModel.PolicyChangesReasonText);
+        Assert.False(viewModel.HasPolicyChangesReason);
         Assert.False(viewModel.IsManagementLoading);
     }
 
@@ -752,6 +756,7 @@ public class AgentPolicyInspectorViewModelTests
         Assert.Empty(viewModel.AgentWriteCapabilityText);
         Assert.Empty(viewModel.PolicyChangesFromThisAppText);
         Assert.Empty(viewModel.PolicyChangesReasonText);
+        Assert.False(viewModel.HasPolicyChangesReason);
         Assert.False(viewModel.CanCreate);
         Assert.False(viewModel.CanEdit);
         Assert.False(viewModel.CanRepair);
