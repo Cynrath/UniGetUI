@@ -55,6 +55,7 @@ public static class SettingsSearchIndex
         new("Show package icons on package lists", ["package icons"], typeof(Interface_P), "InterfacePackageListsCard"),
         new("Show illustrations on package lists", ["illustrations", "package illustrations"], typeof(Interface_P), "PackageIllustrationsCard"),
         new("Show the installer host on package lists", ["installer host", "download host", "installer url", "column"], typeof(Interface_P), "InstallerHostColumnCard"),
+        new("Show the download size on package lists", ["download size", "installer size", "size", "column"], typeof(Interface_P), "DownloadSizeColumnCard"),
         new("Clear the icon cache", ["icon cache", "clear cache", "cache size"], typeof(Interface_P), "ResetIconCache"),
         new("Select upgradable packages by default", ["select updates", "select upgradable"], typeof(Interface_P), "SelectUpgradableCard"),
         new("User interface preferences", ["interface", "ui"], typeof(Interface_P), null),

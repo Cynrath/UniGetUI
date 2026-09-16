@@ -56,6 +56,13 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
     private static readonly Dictionary<long, (string Host, string Urls)> _installerHostCache = new();
     private static readonly Dictionary<long, long> _unresolvedInstallerHosts = new();
 
+    private const string UnknownDownloadSize = "\u2014";
+    private const int MaxDownloadSizeCacheEntries = 1024;
+    private static readonly TimeSpan DownloadSizeRetryInterval = TimeSpan.FromMinutes(5);
+    private static readonly SemaphoreSlim _downloadSizeSemaphore = new(8, 8);
+    private static readonly object _downloadSizeCacheLock = new();
+    private static readonly Dictionary<long, (long Size, long ResolvedAt)> _downloadSizeCache = new();
+
     private static Bitmap? GetCachedIcon(long hash)
     {
         lock (_iconCacheLock)
@@ -194,6 +201,9 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
     public string InstallerHostText { get; private set; } = "";
     public string? InstallerHostTooltip { get; private set; }
 
+    public string DownloadSizeText { get; private set; } = "";
+    public long DownloadSizeBytes { get; private set; }
+
     private CancellationTokenSource? _installerHostCheckCts;
     // Cancels this row's queued/in-flight icon load on disposal so it stops rooting the wrapper.
     private readonly CancellationTokenSource _lifetimeCts = new();
@@ -266,14 +276,14 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
         _ = LoadInstallerHostAsync();
     }
 
-    private string InstallerHostVersion =>
+    private string TargetInstallerVersion =>
         Package.IsUpgradable ? Package.NewVersionString : Package.VersionString;
 
     private async Task LoadInstallerHostAsync()
     {
         CancellationToken token = _lifetimeCts.Token;
         long hash = CoreTools.HashStringAsLong(
-            $"{Package.GetVersionedHash()}|{InstallerHostVersion}"
+            $"{Package.GetVersionedHash()}|{TargetInstallerVersion}"
         );
         try
         {
@@ -336,7 +346,7 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
 #if WINDOWS
         if (Package.Manager is WinGet)
         {
-            string version = InstallerHostVersion;
+            string version = TargetInstallerVersion;
             return await Task.Run(() => WinGet.TryGetInstallerUrls(Package, version), token)
                 .ConfigureAwait(false);
         }
@@ -409,6 +419,120 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
             }
 
             _installerHostCache[hash] = (host, urls);
+        }
+    }
+
+    private int _downloadSizeLoadStarted;
+
+    public void EnsureDownloadSizeLoaded() => _ = EnsureDownloadSizeLoadedAsync();
+
+    public Task EnsureDownloadSizeLoadedAsync()
+    {
+        if (!_page.DownloadSizeColumnVisible) return Task.CompletedTask;
+        if (Interlocked.Exchange(ref _downloadSizeLoadStarted, 1) != 0) return Task.CompletedTask;
+        return LoadDownloadSizeAsync();
+    }
+
+    private async Task LoadDownloadSizeAsync()
+    {
+        CancellationToken token = _lifetimeCts.Token;
+        long hash = CoreTools.HashStringAsLong(
+            $"{Package.GetVersionedHash()}|{TargetInstallerVersion}"
+        );
+        try
+        {
+            if (TryGetCachedDownloadSize(hash, out long cached))
+            {
+                ApplyDownloadSize(cached);
+                return;
+            }
+
+            await _downloadSizeSemaphore.WaitAsync(token).ConfigureAwait(false);
+            long size;
+            try
+            {
+                if (!TryGetCachedDownloadSize(hash, out size))
+                {
+                    size = await ResolveDownloadSizeAsync(token).ConfigureAwait(false);
+                    CacheDownloadSize(hash, size);
+                }
+            }
+            finally
+            {
+                _downloadSizeSemaphore.Release();
+            }
+
+            if (token.IsCancellationRequested) return;
+            ApplyDownloadSize(size);
+        }
+        catch (OperationCanceledException) { }
+        catch (Exception ex)
+        {
+            Logger.Warn($"Could not resolve the download size for {Package.Id}: {ex.Message}");
+        }
+        finally
+        {
+            Interlocked.Exchange(ref _downloadSizeLoadStarted, 0);
+        }
+    }
+
+    private async Task<long> ResolveDownloadSizeAsync(CancellationToken token)
+    {
+        token.ThrowIfCancellationRequested();
+        if (!Package.Details.IsPopulated)
+            await Package.Details.Load().ConfigureAwait(false);
+
+        token.ThrowIfCancellationRequested();
+        return Package.Details.InstallerSize;
+    }
+
+    private void ApplyDownloadSize(long size)
+    {
+        if (!Dispatcher.UIThread.CheckAccess())
+        {
+            Dispatcher.UIThread.Post(() => ApplyDownloadSize(size));
+            return;
+        }
+
+        DownloadSizeBytes = size;
+        DownloadSizeText = size > 0 ? CoreTools.FormatAsSize(size) : UnknownDownloadSize;
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadSizeBytes)));
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DownloadSizeText)));
+    }
+
+    private static bool TryGetCachedDownloadSize(long hash, out long size)
+    {
+        lock (_downloadSizeCacheLock)
+        {
+            size = 0;
+            if (!_downloadSizeCache.TryGetValue(hash, out var entry))
+                return false;
+
+            if (entry.Size > 0)
+            {
+                size = entry.Size;
+                return true;
+            }
+
+            if (Environment.TickCount64 - entry.ResolvedAt < (long)DownloadSizeRetryInterval.TotalMilliseconds)
+                return true;
+
+            _downloadSizeCache.Remove(hash);
+            return false;
+        }
+    }
+
+    private static void CacheDownloadSize(long hash, long size)
+    {
+        lock (_downloadSizeCacheLock)
+        {
+            if (_downloadSizeCache.Count >= MaxDownloadSizeCacheEntries
+                && !_downloadSizeCache.ContainsKey(hash))
+            {
+                _downloadSizeCache.Clear();
+            }
+
+            _downloadSizeCache[hash] = (size, Environment.TickCount64);
         }
     }
 
@@ -705,6 +829,7 @@ public sealed class ObservablePackageCollection : AvaloniaList<PackageWrapper>
         Version,
         NewVersion,
         Source,
+        DownloadSize,
     }
 
     public Sorter CurrentSorter { get; private set; } = Sorter.Name;
@@ -778,9 +903,13 @@ public sealed class ObservablePackageCollection : AvaloniaList<PackageWrapper>
     private static int Compare(PackageWrapper a, PackageWrapper b, Sorter sorter) => sorter switch
     {
         Sorter.Version => a.Package.NormalizedVersion.CompareTo(b.Package.NormalizedVersion),
+        Sorter.DownloadSize => DownloadSizeSortKey(a).CompareTo(DownloadSizeSortKey(b)),
         Sorter.NewVersion => a.Package.NormalizedNewVersion.CompareTo(b.Package.NormalizedNewVersion),
         _ => string.Compare(GetSortKey(a, sorter), GetSortKey(b, sorter), StringComparison.OrdinalIgnoreCase),
     };
+
+    private static long DownloadSizeSortKey(PackageWrapper wrapper)
+        => wrapper.DownloadSizeBytes > 0 ? wrapper.DownloadSizeBytes : long.MaxValue;
 
     private static string GetSortKey(PackageWrapper w, Sorter sorter) => sorter switch
     {
