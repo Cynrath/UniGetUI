@@ -13,7 +13,9 @@ using UniGetUI.Core.SettingsEngine;
 using UniGetUI.Core.Tools;
 using UniGetUI.Interface.Enums;
 using UniGetUI.PackageEngine.Interfaces;
+using UniGetUI.PackageEngine.Managers.PipManager;
 #if WINDOWS
+using UniGetUI.PackageEngine.Managers.ScoopManager;
 using UniGetUI.PackageEngine.Managers.WingetManager;
 #endif
 
@@ -422,15 +424,38 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
         }
     }
 
-    private int _downloadSizeLoadStarted;
+    private readonly object _downloadSizeLoadLock = new();
+    private Task? _downloadSizeLoadTask;
+
+    private bool ManagerReportsDownloadSize
+    {
+        get
+        {
+            if (Package.Manager is Pip) return true;
+#if WINDOWS
+            if (Package.Manager is WinGet or Scoop) return true;
+#endif
+            return false;
+        }
+    }
 
     public void EnsureDownloadSizeLoaded() => _ = EnsureDownloadSizeLoadedAsync();
 
     public Task EnsureDownloadSizeLoadedAsync()
     {
         if (!_page.DownloadSizeColumnVisible) return Task.CompletedTask;
-        if (Interlocked.Exchange(ref _downloadSizeLoadStarted, 1) != 0) return Task.CompletedTask;
-        return LoadDownloadSizeAsync();
+
+        if (!ManagerReportsDownloadSize)
+        {
+            if (DownloadSizeText.Length == 0) ApplyDownloadSize(0);
+            return Task.CompletedTask;
+        }
+
+        lock (_downloadSizeLoadLock)
+        {
+            if (_downloadSizeLoadTask is { IsCompleted: false }) return _downloadSizeLoadTask;
+            return _downloadSizeLoadTask = LoadDownloadSizeAsync();
+        }
     }
 
     private async Task LoadDownloadSizeAsync()
@@ -469,10 +494,6 @@ public sealed class PackageWrapper : INotifyPropertyChanged, IDisposable, IPacka
         catch (Exception ex)
         {
             Logger.Warn($"Could not resolve the download size for {Package.Id}: {ex.Message}");
-        }
-        finally
-        {
-            Interlocked.Exchange(ref _downloadSizeLoadStarted, 0);
         }
     }
 
@@ -893,6 +914,15 @@ public sealed class ObservablePackageCollection : AvaloniaList<PackageWrapper>
     public IEnumerable<PackageWrapper> ApplyToList(IEnumerable<PackageWrapper> items)
     {
         var comparer = Comparer<PackageWrapper>.Create((a, b) => Compare(a, b, CurrentSorter));
+
+        if (CurrentSorter is Sorter.DownloadSize)
+        {
+            var resolvedFirst = items.OrderBy(w => w.DownloadSizeBytes > 0 ? 0 : 1);
+            return _ascending
+                ? resolvedFirst.ThenBy(w => w, comparer)
+                : resolvedFirst.ThenByDescending(w => w, comparer);
+        }
+
         return _ascending ? items.OrderBy(w => w, comparer) : items.OrderByDescending(w => w, comparer);
     }
 

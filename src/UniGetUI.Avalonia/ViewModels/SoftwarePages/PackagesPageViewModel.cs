@@ -106,7 +106,6 @@ public class SourceTreeNode : INotifyPropertyChanged
 public partial class PackagesPageViewModel : ViewModelBase
 {
     private const int MaximumPreloadedIcons = 512;
-    private const int MaximumPreloadedDownloadSizes = 256;
     // Live width of the filter pane. Code-behind keeps this in sync with the GridSplitter
     // so the toolbar's main button (bound to FilterPaneColumnWidth) tracks resizes.
     private double _trackedFilterPaneWidth = 220.0;
@@ -509,7 +508,7 @@ public partial class PackagesPageViewModel : ViewModelBase
         _downloadSizePreloadCts?.Dispose();
         _downloadSizePreloadCts = new CancellationTokenSource();
         _ = PreloadDownloadSizesAsync(
-            FilteredPackages.Take(MaximumPreloadedDownloadSizes).ToArray(),
+            FilteredPackages.ToArray(),
             _downloadSizePreloadCts.Token);
     }
 

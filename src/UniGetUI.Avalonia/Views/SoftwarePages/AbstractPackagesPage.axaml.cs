@@ -125,7 +125,6 @@ public abstract partial class AbstractPackagesPage : UserControl,
                 "Version" => ObservablePackageCollection.Sorter.Version,
                 "NewVersion" => ObservablePackageCollection.Sorter.NewVersion,
                 "Source" => ObservablePackageCollection.Sorter.Source,
-                "DownloadSize" => ObservablePackageCollection.Sorter.DownloadSize,
                 _ => null,
             };
             if (sorter is null) continue;

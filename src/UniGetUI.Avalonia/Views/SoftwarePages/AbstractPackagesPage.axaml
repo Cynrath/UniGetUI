@@ -689,7 +689,7 @@
                                         </DataTemplate>
                                     </DataGridTemplateColumn.CellTemplate>
                                 </DataGridTemplateColumn>
-                                <DataGridTemplateColumn Tag="DownloadSize"
+                                <DataGridTemplateColumn CanUserSort="False"
                                                         Header="{Binding $parent[UserControl].((vm:PackagesPageViewModel)DataContext).DownloadSizeHeaderText}"
                                                         Width="*"
                                                         IsVisible="{Binding $parent[UserControl].((vm:PackagesPageViewModel)DataContext).DownloadSizeColumnVisible}">
