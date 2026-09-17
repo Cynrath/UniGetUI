@@ -1,0 +1,75 @@
+name: ACKit
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'ackit.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'GEMINI.md'
+      - '.github/copilot-instructions.md'
+      - '.agents/**'
+      - 'docs/ACKIT.md'
+      - 'docs/tasks/**'
+      - 'docs/ackit/**'
+      - '.github/workflows/ackit.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - 'ackit.yml'
+      - 'AGENTS.md'
+      - 'CLAUDE.md'
+      - 'GEMINI.md'
+      - '.github/copilot-instructions.md'
+      - '.agents/**'
+      - 'docs/ACKIT.md'
+      - 'docs/tasks/**'
+      - 'docs/ackit/**'
+      - '.github/workflows/ackit.yml'
+  workflow_dispatch:
+
+jobs:
+  ackit:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+
+      - name: ACKit config check
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 config check
+
+      - name: ACKit policy check
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 policy check
+
+      - name: ACKit skills validate
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 skills validate
+
+      - name: ACKit task doctor
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 task doctor
+
+      - name: ACKit readiness strict
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 readiness --strict
+
+      - name: ACKit scan changed files gate
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 scan --changed --ci
+
+      - name: ACKit full scan against baseline
+        continue-on-error: true
+        run: npx --yes @cynrath/agent-context-kit@0.5.2 scan --baseline docs/ackit/scan-baseline.json --format sarif --output ackit-scan.sarif
+
+      - name: Upload ACKit SARIF
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ackit-scan-sarif
+          path: ackit-scan.sarif
+          if-no-files-found: ignore
