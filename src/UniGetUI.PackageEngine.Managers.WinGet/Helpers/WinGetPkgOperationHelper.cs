@@ -379,6 +379,15 @@ internal sealed class WinGetPkgOperationHelper : BasePkgOperationHelper
         return OperationVeredict.Failure;
     }
 
+    /// <summary>
+    /// Records a native COM install/upgrade as done, mirroring the CLI success
+    /// path so update suppression (#5042) and stuck-loop detection (#5158)
+    /// keep working for native operations. Only updates feed the stuck-update
+    /// counter; installs must not.
+    /// </summary>
+    internal static void MarkUpgradeAsDoneForNative(IPackage package, OperationType operation) =>
+        MarkUpgradeAsDone(package, countTowardStuckLoop: operation is OperationType.Update);
+
     // Default number of "successful" upgrades to the same version (without the installed version
     // advancing) after which the update is suppressed; overridable via WinGetStuckUpgradeThreshold (#5158).
     private const int DefaultStuckUpgradeThreshold = 3;

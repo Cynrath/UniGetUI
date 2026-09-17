@@ -80,6 +80,9 @@ public sealed partial class OperationViewModel : ViewModelBase
         operation.StatusChanged += (_, status) =>
             Dispatcher.UIThread.Post(() => ApplyStatus(status));
 
+        operation.ProgressChanged += (_, progress) =>
+            Dispatcher.UIThread.Post(() => ApplyProgress(progress));
+
         operation.BadgesChanged += (_, badges) =>
             Dispatcher.UIThread.Post(() =>
             {
@@ -109,6 +112,33 @@ public sealed partial class OperationViewModel : ViewModelBase
 
         // Sync with current status in case the operation already started
         ApplyStatus(operation.Status);
+        ApplyProgress(operation.CurrentProgress);
+    }
+
+    /// <summary>
+    /// Applies structured progress to the card. Unknown progress keeps the
+    /// existing indeterminate animation; known progress switches to a
+    /// determinate bar with percent/byte text. Terminal statuses own the
+    /// final visuals, so progress arriving after completion is ignored.
+    /// </summary>
+    private void ApplyProgress(OperationProgress progress)
+    {
+        if (Operation.Status is not OperationStatus.Running)
+            return;
+
+        if (progress is null || !progress.IsDeterminate)
+        {
+            ProgressIndeterminate = true;
+            // Keep log-driven LiveLine for plain Unknown resets; only show a
+            // stage label when the manager reported a real (but unmeasured) phase.
+            if (progress is not null && progress.Stage is not OperationProgressStage.Unknown)
+                LiveLine = OperationProgressFormatter.Format(progress);
+            return;
+        }
+
+        ProgressIndeterminate = false;
+        ProgressValue = Math.Clamp(progress.Percentage!.Value, 0, 100);
+        LiveLine = OperationProgressFormatter.Format(progress);
     }
 
     // ── Icon loading ──────────────────────────────────────────────────────────

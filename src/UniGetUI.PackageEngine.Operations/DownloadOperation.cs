@@ -96,6 +96,11 @@ public class DownloadOperation : AbstractOperation
 
             var totalBytes = response.Content.Headers.ContentLength ?? -1L;
             var canReportProgress = totalBytes > 0;
+            ReportProgress(
+                totalBytes > 0
+                    ? OperationProgress.FromDownload(0, (ulong)totalBytes)
+                    : OperationProgress.FromDownload(0, 0)
+            );
             await using (var contentStream = await response.Content.ReadAsStreamAsync(CancellationToken))
             await using (var fileStream = new FileStream(
                 downloadLocation,
@@ -131,6 +136,9 @@ public class DownloadOperation : AbstractOperation
                                     $"{CoreTools.FormatAsSize(totalRead)}/{CoreTools.FormatAsSize(totalBytes)}"
                                 ),
                                 LineType.ProgressIndicator
+                            );
+                            ReportProgress(
+                                OperationProgress.FromDownload((ulong)totalRead, (ulong)totalBytes)
                             );
                         }
                     }

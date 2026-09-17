@@ -18,8 +18,78 @@ public abstract partial class AbstractOperation : IDisposable
     public event EventHandler<EventArgs>? OperationSucceeded;
     public event EventHandler<EventArgs>? OperationFailed;
     public event EventHandler<BadgeCollection>? BadgesChanged;
+    public event EventHandler<OperationProgress>? ProgressChanged;
 
     public bool Started { get; private set; }
+
+    private readonly object ProgressLock = new();
+    private OperationProgress _currentProgress = OperationProgress.Unknown;
+    private OperationProgress _lastRaisedProgress = OperationProgress.Unknown;
+    private DateTime _lastProgressReportUtc = DateTime.MinValue;
+
+    /// <summary>
+    /// Latest structured progress reported by the executing manager.
+    /// <see cref="OperationProgress.Unknown"/> when no real progress is known,
+    /// in which case the UI must stay indeterminate.
+    /// </summary>
+    public OperationProgress CurrentProgress
+    {
+        get
+        {
+            lock (ProgressLock)
+                return _currentProgress;
+        }
+    }
+
+    /// <summary>
+    /// Reports structured progress from any thread. Reports are de-duplicated
+    /// and coalesced so rapid native callbacks cannot spam the UI: identical
+    /// reports are dropped, stage changes and Unknown/100% are always raised,
+    /// and small determinate deltas within 200ms are coalesced.
+    /// </summary>
+    protected void ReportProgress(OperationProgress progress)
+    {
+        ArgumentNullException.ThrowIfNull(progress);
+        bool shouldRaise;
+        lock (ProgressLock)
+        {
+            _currentProgress = progress;
+            if (progress.Equals(_lastRaisedProgress))
+            {
+                shouldRaise = false;
+            }
+            else if (
+                progress.Stage == _lastRaisedProgress.Stage
+                && progress.IsDeterminate
+                && _lastRaisedProgress.IsDeterminate
+                && progress.Percentage.HasValue
+                && _lastRaisedProgress.Percentage.HasValue
+                && progress.Percentage.Value is not 100
+                && _lastRaisedProgress.Percentage.Value is not 100
+                && Math.Abs(progress.Percentage.Value - _lastRaisedProgress.Percentage.Value) < 1.0
+                && DateTime.UtcNow - _lastProgressReportUtc < TimeSpan.FromMilliseconds(200)
+                && progress.Stage is not OperationProgressStage.Unknown
+            )
+            {
+                shouldRaise = false;
+            }
+            else
+            {
+                shouldRaise = true;
+                _lastRaisedProgress = progress;
+                _lastProgressReportUtc = DateTime.UtcNow;
+            }
+        }
+
+        if (shouldRaise)
+            ProgressChanged?.Invoke(this, progress);
+    }
+
+    /// <summary>
+    /// Resets structured progress to unknown (indeterminate). Called at the
+    /// start of every execution attempt so retries never show stale progress.
+    /// </summary>
+    protected void ResetProgress() => ReportProgress(OperationProgress.Unknown);
     protected bool QUEUE_ENABLED;
     protected bool FORCE_HOLD_QUEUE;
     private bool IsInnerOperation;
@@ -513,6 +583,7 @@ public abstract partial class AbstractOperation : IDisposable
                 break;
             }
 
+            ResetProgress();
             OperationStarting?.Invoke(this, EventArgs.Empty);
 
             try

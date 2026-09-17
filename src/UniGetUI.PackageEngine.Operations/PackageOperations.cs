@@ -298,11 +298,51 @@ namespace UniGetUI.PackageEngine.Operations
         {
             if (!ShouldUseAgentBroker())
             {
+#if WINDOWS
+                OperationVeredict? nativeResult = await TryPerformNativeWinGetOperationAsync()
+                    .ConfigureAwait(false);
+                if (nativeResult.HasValue)
+                    return nativeResult.Value;
+#endif
                 return await base.PerformOperation();
             }
 
             return await PerformBrokerOperation();
         }
+
+#if WINDOWS
+        /// <summary>
+        /// Attempts a native WinGet COM execution with structured progress when the
+        /// operation can be faithfully honored that way. Returns null to fall back
+        /// to the CLI process path. The UI stays generic: progress arrives as
+        /// <see cref="OperationProgress"/> and is also logged as a live line so
+        /// existing LiveLine/IPC consumers keep working.
+        /// </summary>
+        private async Task<OperationVeredict?> TryPerformNativeWinGetOperationAsync()
+        {
+            if (Package.Manager is not WinGet)
+                return null;
+
+            if (!WinGetNativeOperationRunner.CanUseNative(Package, Options, Role))
+                return null;
+
+            return await WinGetNativeOperationRunner
+                .ExecuteAsync(
+                    Package,
+                    Options,
+                    Role,
+                    progress =>
+                    {
+                        ReportProgress(progress);
+                        Line(OperationProgressFormatter.Format(progress), LineType.ProgressIndicator);
+                    },
+                    info => Line(info, LineType.Information),
+                    error => Line(error, LineType.Error),
+                    CancellationToken
+                )
+                .ConfigureAwait(false);
+        }
+#endif
 
         /// <summary>
         /// Determines whether this operation should be routed through the agent broker.
