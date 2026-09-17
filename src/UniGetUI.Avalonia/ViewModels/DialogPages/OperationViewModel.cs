@@ -57,6 +57,8 @@ public sealed partial class OperationViewModel : ViewModelBase
     private static readonly Uri _fallbackIconUri =
         new("avares://UniGetUI/Assets/package_color.png");
 
+    private OperationCardProgressState _cardProgress;
+
     public OperationViewModel(AbstractOperation operation)
     {
         Operation = operation;
@@ -70,6 +72,11 @@ public sealed partial class OperationViewModel : ViewModelBase
         _buttonText = CoreTools.Translate("Cancel");
         _progressBrush = new SolidColorBrush(Color.Parse("#888888"));
         _backgroundBrush = Brushes.Transparent;
+        _cardProgress = new OperationCardProgressState(
+            IsIndeterminate: _progressIndeterminate,
+            Value: _progressValue,
+            LiveLine: _liveLine
+        );
 
         _ = LoadIconAsync();
 
@@ -120,25 +127,16 @@ public sealed partial class OperationViewModel : ViewModelBase
     /// existing indeterminate animation; known progress switches to a
     /// determinate bar with percent/byte text. Terminal statuses own the
     /// final visuals, so progress arriving after completion is ignored.
+    /// The mapping itself lives in <see cref="OperationCardProgressState"/>
+    /// so it is unit-testable without Avalonia; this method only copies the
+    /// result onto bindable properties on the UI thread.
     /// </summary>
     private void ApplyProgress(OperationProgress progress)
     {
-        if (Operation.Status is not OperationStatus.Running)
-            return;
-
-        if (progress is null || !progress.IsDeterminate)
-        {
-            ProgressIndeterminate = true;
-            // Keep log-driven LiveLine for plain Unknown resets; only show a
-            // stage label when the manager reported a real (but unmeasured) phase.
-            if (progress is not null && progress.Stage is not OperationProgressStage.Unknown)
-                LiveLine = OperationProgressFormatter.Format(progress);
-            return;
-        }
-
-        ProgressIndeterminate = false;
-        ProgressValue = Math.Clamp(progress.Percentage!.Value, 0, 100);
-        LiveLine = OperationProgressFormatter.Format(progress);
+        _cardProgress = _cardProgress.WithProgress(Operation.Status, progress);
+        ProgressIndeterminate = _cardProgress.IsIndeterminate;
+        ProgressValue = _cardProgress.Value;
+        LiveLine = _cardProgress.LiveLine;
     }
 
     // ── Icon loading ──────────────────────────────────────────────────────────
@@ -181,42 +179,37 @@ public sealed partial class OperationViewModel : ViewModelBase
     // ── Status → visual properties ────────────────────────────────────────────
     private void ApplyStatus(OperationStatus status)
     {
+        _cardProgress = _cardProgress.WithStatus(status);
+        ProgressIndeterminate = _cardProgress.IsIndeterminate;
+        ProgressValue = _cardProgress.Value;
+
         switch (status)
         {
             case OperationStatus.InQueue:
-                ProgressIndeterminate = false;
-                ProgressValue = 0;
                 ProgressBrush = new SolidColorBrush(Color.Parse("#888888"));
                 BackgroundBrush = Brushes.Transparent;
                 ButtonText = CoreTools.Translate("Cancel");
                 break;
 
             case OperationStatus.Running:
-                ProgressIndeterminate = true;
                 ProgressBrush = new SolidColorBrush(Color.Parse("#F0A500"));
                 BackgroundBrush = new SolidColorBrush(Color.FromArgb(30, 240, 165, 0));
                 ButtonText = CoreTools.Translate("Cancel");
                 break;
 
             case OperationStatus.Succeeded:
-                ProgressIndeterminate = false;
-                ProgressValue = 100;
                 ProgressBrush = new SolidColorBrush(Color.Parse("#0F7B0F"));
                 BackgroundBrush = new SolidColorBrush(Color.FromArgb(30, 15, 123, 15));
                 ButtonText = CoreTools.Translate("Close");
                 break;
 
             case OperationStatus.Failed:
-                ProgressIndeterminate = false;
-                ProgressValue = 100;
                 ProgressBrush = new SolidColorBrush(Color.Parse("#BC0000"));
                 BackgroundBrush = new SolidColorBrush(Color.FromArgb(40, 188, 0, 0));
                 ButtonText = CoreTools.Translate("Close");
                 break;
 
             case OperationStatus.Canceled:
-                ProgressIndeterminate = false;
-                ProgressValue = 100;
                 ProgressBrush = new SolidColorBrush(Color.Parse("#9D5D00"));
                 BackgroundBrush = Brushes.Transparent;
                 ButtonText = CoreTools.Translate("Close");
