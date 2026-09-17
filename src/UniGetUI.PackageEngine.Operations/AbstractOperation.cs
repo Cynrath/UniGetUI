@@ -26,6 +26,19 @@ public abstract partial class AbstractOperation : IDisposable
     private OperationProgress _currentProgress = OperationProgress.Unknown;
     private OperationProgress _lastRaisedProgress = OperationProgress.Unknown;
     private DateTime _lastProgressReportUtc = DateTime.MinValue;
+    private readonly DownloadThroughputTracker _throughputTracker = new();
+    private volatile Func<DateTime> _utcNowProvider = static () => DateTime.UtcNow;
+
+    /// <summary>
+    /// Test hook: overrides the clock used for download throughput sampling so
+    /// speed calculation is deterministic in tests. Production always uses
+    /// <see cref="DateTime.UtcNow"/>.
+    /// </summary>
+    internal void SetUtcNowProviderForTests(Func<DateTime> provider)
+    {
+        ArgumentNullException.ThrowIfNull(provider);
+        _utcNowProvider = provider;
+    }
 
     /// <summary>
     /// Latest structured progress reported by the executing manager.
@@ -46,13 +59,23 @@ public abstract partial class AbstractOperation : IDisposable
     /// and coalesced so rapid native callbacks cannot spam the UI: identical
     /// reports are dropped, stage changes and Unknown/100% are always raised,
     /// and small determinate deltas within 200ms are coalesced.
+    /// Downloading reports carrying a byte counter are enriched here with a
+    /// measured <c>BytesPerSecond</c> throughput (see
+    /// <see cref="DownloadThroughputTracker"/>), so WinGet native COM,
+    /// <c>DownloadOperation</c> HTTP and future byte-counter managers share one
+    /// mechanism while their mappers stay stateless. Every other stage, and
+    /// downloading reports without a usable counter, reset the sampler and
+    /// carry no speed, so stale speeds can never leak across stage transitions,
+    /// unknown progress, retries or terminal states.
     /// </summary>
     protected void ReportProgress(OperationProgress progress)
     {
         ArgumentNullException.ThrowIfNull(progress);
+        DateTime timestampUtc = _utcNowProvider();
         bool shouldRaise;
         lock (ProgressLock)
         {
+            progress = AttachThroughputLocked(progress, timestampUtc);
             _currentProgress = progress;
             if (progress.Equals(_lastRaisedProgress))
             {
@@ -86,8 +109,43 @@ public abstract partial class AbstractOperation : IDisposable
     }
 
     /// <summary>
+    /// Attaches a measured download throughput to <paramref name="progress"/>
+    /// when it is a downloading report with a usable byte counter. Must be
+    /// called with <c>ProgressLock</c> held. Non-downloading stages and
+    /// downloading reports without a counter reset the sampler and have any
+    /// incoming speed stripped, so only real freshly-sampled speeds survive.
+    /// </summary>
+    private OperationProgress AttachThroughputLocked(
+        OperationProgress progress,
+        DateTime timestampUtc
+    )
+    {
+        if (
+            progress.Stage is not OperationProgressStage.Downloading
+            || !progress.BytesDownloaded.HasValue
+        )
+        {
+            _throughputTracker.Reset();
+            return progress.BytesPerSecond is null
+                ? progress
+                : progress with { BytesPerSecond = null };
+        }
+
+        double? speed = _throughputTracker.Observe(
+            progress.BytesDownloaded.Value,
+            timestampUtc
+        );
+        double? normalized = OperationProgress.NormalizeBytesPerSecond(speed);
+        return normalized == progress.BytesPerSecond
+            ? progress
+            : progress with { BytesPerSecond = normalized };
+    }
+
+    /// <summary>
     /// Resets structured progress to unknown (indeterminate). Called at the
     /// start of every execution attempt so retries never show stale progress.
+    /// The throughput sampler is reset through the same path, so a retry never
+    /// leaks the previous attempt's download speed.
     /// </summary>
     protected void ResetProgress() => ReportProgress(OperationProgress.Unknown);
     protected bool QUEUE_ENABLED;

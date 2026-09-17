@@ -155,6 +155,46 @@ public sealed class OperationCardProgressStateTests
     }
 
     [Fact]
+    public void Running_DownloadWithSpeed_ShowsThroughputInLiveLine()
+    {
+        var card = RunningCard()
+            .WithProgress(
+                OperationStatus.Running,
+                OperationProgress.FromDownload(21, 100) with { BytesPerSecond = 3.8 * 1024 * 1024 }
+            );
+
+        Assert.False(card.IsIndeterminate);
+        Assert.Contains("21%", card.LiveLine);
+        Assert.Contains("MB/s", card.LiveLine);
+    }
+
+    [Theory]
+    [InlineData(OperationStatus.Succeeded)]
+    [InlineData(OperationStatus.Failed)]
+    [InlineData(OperationStatus.Canceled)]
+    public void ProgressWithSpeed_AfterTerminal_IsIgnored(OperationStatus status)
+    {
+        // Terminal visuals own the card: a stale speed-bearing report arriving
+        // after completion must not leak back into the visuals.
+        var card = RunningCard()
+            .WithProgress(
+                OperationStatus.Running,
+                OperationProgress.FromDownload(40, 100) with { BytesPerSecond = 1024 }
+            )
+            .WithStatus(status);
+        var before = card;
+
+        card = card.WithProgress(
+            status,
+            OperationProgress.FromDownload(90, 100) with { BytesPerSecond = 999_999 }
+        );
+
+        Assert.Equal(before, card);
+        Assert.Equal(100, card.Value);
+        Assert.False(card.IsIndeterminate);
+    }
+
+    [Fact]
     public void InQueue_ResetsToZero()
     {
         var card = RunningCard()

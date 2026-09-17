@@ -19,12 +19,17 @@ public enum OperationProgressStage
 /// <see cref="Percentage"/> is null when the real percentage is unknown, in
 /// which case the UI must stay indeterminate. Byte counters are optional and
 /// only set when the manager reports reliable values.
+/// <see cref="BytesPerSecond"/> is an optional measured throughput attached
+/// downstream by the generic operation layer (never by manager mappers): it is
+/// only present on <see cref="OperationProgressStage.Downloading"/> reports
+/// with a usable byte counter, and is null otherwise.
 /// </summary>
 public sealed record OperationProgress(
     double? Percentage,
     ulong? BytesDownloaded = null,
     ulong? BytesTotal = null,
-    OperationProgressStage Stage = OperationProgressStage.Unknown
+    OperationProgressStage Stage = OperationProgressStage.Unknown,
+    double? BytesPerSecond = null
 )
 {
     public static readonly OperationProgress Unknown = new(
@@ -58,10 +63,34 @@ public sealed record OperationProgress(
     }
 
     /// <summary>
+    /// Normalizes a measured throughput in bytes per second: NaN, Infinity and
+    /// non-positive values carry no information and become unknown (null).
+    /// </summary>
+    public static double? NormalizeBytesPerSecond(double? value)
+    {
+        if (value is null)
+            return null;
+        double v = value.Value;
+        if (double.IsNaN(v) || double.IsInfinity(v))
+            return null;
+        if (v <= 0)
+            return null;
+        return v;
+    }
+
+    /// <summary>
+    /// True when <see cref="BytesPerSecond"/> holds a real usable throughput.
+    /// </summary>
+    public bool HasThroughput => NormalizeBytesPerSecond(BytesPerSecond).HasValue;
+
+    /// <summary>
     /// Builds a download progress report. Prefers byte-based percentage when
     /// <paramref name="bytesTotal"/> is greater than zero; otherwise falls back
     /// to <paramref name="reportedPercentage"/>. A zero/unknown total with no
     /// usable reported value yields an indeterminate report (no fake percent).
+    /// Throughput is never set here: <see cref="BytesPerSecond"/> stays null so
+    /// the mapper remains stateless, and the generic operation layer attaches
+    /// the measured speed downstream from cumulative byte samples.
     /// </summary>
     public static OperationProgress FromDownload(
         ulong bytesDownloaded,

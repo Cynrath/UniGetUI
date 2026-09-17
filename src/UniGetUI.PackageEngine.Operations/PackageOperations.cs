@@ -334,7 +334,12 @@ namespace UniGetUI.PackageEngine.Operations
                     progress =>
                     {
                         ReportProgress(progress);
-                        Line(OperationProgressFormatter.Format(progress), LineType.ProgressIndicator);
+                        // Format the enriched progress (with measured download
+                        // throughput) so the live log line matches the card.
+                        Line(
+                            OperationProgressFormatter.Format(CurrentProgress),
+                            LineType.ProgressIndicator
+                        );
                     },
                     info => Line(info, LineType.Information),
                     error => Line(error, LineType.Error),
