@@ -1,3 +1,11 @@
+<!-- ackit:managed:start (codex) -->
+# ACKit canonical workflow
+
+- Docs-first, task-first: keep one active task under docs/tasks/ with a single `[~]` checklist item.
+- Complete tasks only with recorded evidence; then continue with the next dependency-ready task.
+- Run `ackit doctor` and `ackit scan --ci` as standing quality gates.
+- Offline-first: never send repository content to external services.
+<!-- ackit:managed:end (codex) -->
 # UniGetUI - Copilot Instructions
 
 ## Project Overview
@@ -208,3 +216,73 @@ Use `CoreTools.Translate("text")` for all user-facing strings. Parameterized: `C
 | Setting keys | `src/UniGetUI.Core.Settings/SettingsEngine_Names.cs` |
 | Logger | `src/UniGetUI.Core.Logger/Logger.cs` |
 | CI test workflow | `.github/workflows/dotnet-test.yml` |
+
+## Formatting discipline
+
+Do not run a broad mutating `dotnet format` blindly across the solution.
+Use repository-verified style/whitespace commands and inspect the diff.
+
+```powershell
+pwsh ./scripts/install-git-hooks.ps1
+dotnet format whitespace src --folder --verify-no-changes
+dotnet format style src/UniGetUI.Windows.slnx --no-restore --verify-no-changes
+```
+
+The pre-commit hook formats only staged files under `src` when `dotnet` is available. If it rewrites files, review and commit again. Rules live in `src/.editorconfig`.
+
+## Windows conditional compilation
+
+- Windows-only integrations (WinGet COM via `Microsoft.Management.Deployment`, registry, AppSDK paths) must stay behind Windows guards; the Avalonia solution still builds cross-platform.
+- Prefer `OperatingSystem.IsWindows()` and Windows TFM conditions over scattering `#if WINDOWS` unless the project already uses that pattern.
+- Never break `src/UniGetUI.Avalonia.slnx` for a Windows-only optimization.
+
+## Localization
+
+- All user-facing strings go through `CoreTools.Translate("text")`; never hardcode English in Views/ViewModels.
+- Translation source of truth is `src/Languages/lang_en.json`; locale files are reordered to match English key order.
+- Use `translation-source-sync` skill after changing translatable strings, then `Verify-Translations.ps1`.
+- Watch for tr-TR/invariant casing hazards (`ToUpper`/`ToLower` without explicit culture) and placeholder parity (`{0}`, HTML fragments, newlines).
+
+## Task and evidence workflow
+
+- One active ACKit task under `docs/tasks/active/` with a single `[~]` item; create via `ackit task create "<title>"`, start via `ackit task start <id>`.
+- Link proof, do not assert it: `ackit evidence sync/verify/validate`, independent `ackit verification bundle/record` when the profile requires it.
+- Gates before commit: `ackit doctor`, `ackit task doctor`, `ackit scan --ci`.
+- See `docs/ACKIT.md` for the full start-of-task sequence and completion gate.
+
+## Git hygiene
+
+- Branch from clean `origin/main`; never merge local `main` or unrelated feature branches.
+- Keep PRs focused; do not leave the tree non-buildable between commits.
+- Never push local `main` upstream. Prefer `--force-with-lease` for rebased feature branches only.
+- Upstream is `Devolutions/UniGetUI` (`origin`); personal fork is `Cynrath/UniGetUI` (`fork`).
+
+## Generated files
+
+- Do not hand-edit: `generate-secrets.ps1` output, integrity tree (`scripts/generate-integrity-tree.ps1`), `TranslatedPercentages.json`, `bin/obj/out` outputs.
+- Edit owning sources/templates (`scripts/translation/*`, `src/Languages/lang_en.json`) rather than derived artifacts.
+
+## CI expectations
+
+- `.github/workflows/dotnet-test.yml` runs whitespace/style checks, Windows x64 build, tests, full-trim and NativeAOT publish reports.
+- `.github/workflows/ackit.yml` runs `ackit config check`, `ackit policy check`, `ackit skills validate`, `ackit task doctor`, `ackit scan --ci`, `ackit readiness --strict`.
+- Investigate CI failures from logs; do not weaken thresholds to get green.
+
+## ACKit workflow
+
+- Config: `ackit.yml` (`ackit config check`).
+- Start of task: `ackit instructions --explain`, `ackit task list/show`, `ackit pack --profile codex --max-tokens 50000`.
+- During work: `ackit scan --changed`, `ackit scan --staged`.
+- Before done: `ackit policy check`, `ackit skills validate`, `ackit readiness --strict`, `ackit optimize --explain`, `ackit diagnostics --json`.
+- Full guide: `docs/ACKIT.md`.
+
+## Completion criteria
+
+- Build/test/style gates relevant to the change pass with counts recorded.
+- ACKit gates pass (`config`, `policy`, `skills validate`, `task doctor`, `scan --ci`, `readiness --strict`).
+- `git status --short`, `git diff --stat`, `git diff --check` reviewed; no unrelated changes, secrets, absolute paths, or generated junk.
+
+## Preservation
+
+- Keep unrelated changes out of the diff; do not reformat untouched files.
+- Respect existing architecture and public contracts unless the task explicitly changes them.

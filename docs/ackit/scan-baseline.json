@@ -1,0 +1,575 @@
+{
+  "schemaVersion": 1,
+  "generatedBy": "ackit 0.5.2",
+  "createdAt": "2026-09-17T12:16:09.782Z",
+  "findings": [
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "4a4a2b7351f45341",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 38,
+      "column": 48,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "c7da262e06bad3a0",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 101,
+      "column": 4,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "d53a7e13b14d0af5",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 118,
+      "column": 10,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "90cb059af8246c6c",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 123,
+      "column": 7,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "0d60359fb7e8fe77",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 131,
+      "column": 123,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "f2ca01c3914cd562",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 330,
+      "column": 61,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "5f4493e185136bf6",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 377,
+      "column": 15,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "f90cf9fa2184dd4c",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 378,
+      "column": 27,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "22618f6d19bbac81",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 382,
+      "column": 11,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "88199f41c098aaf2",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 506,
+      "column": 185,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "6b9a755e75546b7b",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 677,
+      "column": 7,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "7911758fc223f54e",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 685,
+      "column": 56,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "f5d74acd6be0f118",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 799,
+      "column": 52,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "f46dbb5c014fcb9d",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 860,
+      "column": 51,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "419b9cee4a0c2768",
+      "relativePath": ".github/workflows/build-release.yml",
+      "line": 899,
+      "column": 9,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "bc329684c21af2ca",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 55,
+      "column": 55,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "7a5c48f0da8be9ea",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 59,
+      "column": 7,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "658596abb0c4b735",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 64,
+      "column": 6,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "ef0a83d5c1ffaf1e",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 68,
+      "column": 10,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "8aaa1a26631b37ab",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 73,
+      "column": 8,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "54216bedfc9a17e2",
+      "relativePath": ".github/workflows/cli-headless-e2e.yml",
+      "line": 170,
+      "column": 49,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "48dc0bbd2f83394e",
+      "relativePath": ".github/workflows/codeql.yml",
+      "line": 53,
+      "column": 177,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "ed1f5ed0955bd20a",
+      "relativePath": ".github/workflows/codeql.yml",
+      "line": 58,
+      "column": 23,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "5589de809b015f51",
+      "relativePath": ".github/workflows/codeql.yml",
+      "line": 83,
+      "column": 33,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "4eca8d3a19a52c1e",
+      "relativePath": ".github/workflows/dotnet-test.yml",
+      "line": 39,
+      "column": 10,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "fb2d32b5b1f848ac",
+      "relativePath": ".github/workflows/dotnet-test.yml",
+      "line": 43,
+      "column": 12,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "a3a886dccf5b3808",
+      "relativePath": ".github/workflows/dotnet-test.yml",
+      "line": 48,
+      "column": 26,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT070",
+      "fingerprint": "adcd2535dd6adcc5",
+      "relativePath": ".github/workflows/translation-validation.yml",
+      "line": 35,
+      "column": 3,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "553f092254d6fef4",
+      "relativePath": "WebBasedData/screenshot-database-v2.json",
+      "line": 190,
+      "column": 14,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "8492025455509390",
+      "relativePath": "WebBasedData/screenshot-database-v2.json",
+      "line": 1568,
+      "column": 17,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "56acd438211081fd",
+      "relativePath": "WebBasedData/screenshot-database-v2.json",
+      "line": 2731,
+      "column": 9,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "c57a9aa3e3a5b1aa",
+      "relativePath": "WebBasedData/screenshot-database.json",
+      "line": 81,
+      "column": 1,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "16aff0dbd342d4d3",
+      "relativePath": "WebBasedData/screenshot-database.json",
+      "line": 606,
+      "column": 31,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "8c2dd137e051efb1",
+      "relativePath": "WebBasedData/screenshot-database.json",
+      "line": 1303,
+      "column": 64,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "9f07dc45571b75f8",
+      "relativePath": "WebBasedData/screenshot-database.json",
+      "line": 1314,
+      "column": 65,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "0b5d6e3b731084c3",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/CLSIDGuid.cs",
+      "line": 6,
+      "column": 37,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "abacf624619baf80",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/CLSIDGuid.cs",
+      "line": 7,
+      "column": 40,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "212b1f36c1a6facb",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/CLSIDGuid.cs",
+      "line": 8,
+      "column": 35,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "cb39711f35e3553e",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/IIDGuid.cs",
+      "line": 5,
+      "column": 36,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "601aace606aab3c3",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/IIDGuid.cs",
+      "line": 6,
+      "column": 34,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "adc6842517bbe190",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/IIDGuid.cs",
+      "line": 11,
+      "column": 38,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "d7f7bbbab621964e",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/IIDGuid.cs",
+      "line": 15,
+      "column": 33,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "9e1586db00538396",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/KFIDGuid.cs",
+      "line": 5,
+      "column": 38,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "104b108772da6cb2",
+      "relativePath": "src/ExternalLibraries.FilePickers/Guids/KFIDGuid.cs",
+      "line": 8,
+      "column": 28,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "9ab93cb80043bb88",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/AvaloniaAutoUpdater.cs",
+      "line": 38,
+      "column": 24,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "fe5ab27584b450cf",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/AvaloniaAutoUpdater.cs",
+      "line": 338,
+      "column": 62,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "9c78bfb749630d08",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/NativeWebViewSupport.cs",
+      "line": 32,
+      "column": 25,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "2afe0eb078558acd",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/generate-secrets.ps1",
+      "line": 14,
+      "column": 32,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "26d7ecc2a23dacec",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/generate-secrets.ps1",
+      "line": 20,
+      "column": 9,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "06c422d8b3e7324e",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/generate-secrets.sh",
+      "line": 7,
+      "column": 36,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "f4c1cad348fb1d82",
+      "relativePath": "src/UniGetUI.Avalonia/Infrastructure/generate-secrets.sh",
+      "line": 13,
+      "column": 22,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "c1c196f3c7f59847",
+      "relativePath": "src/UniGetUI.Avalonia/ViewModels/SoftwarePages/PackagesPageViewModel.cs",
+      "line": 44,
+      "column": 7,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "fca3b7dcb35373e9",
+      "relativePath": "src/UniGetUI.Avalonia/ViewModels/SoftwarePages/PackagesPageViewModel.cs",
+      "line": 237,
+      "column": 46,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "8919e2076f672760",
+      "relativePath": "src/UniGetUI.Avalonia/Views/MainWindow.axaml.cs",
+      "line": 121,
+      "column": 22,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "a9f90e34dcf6bae3",
+      "relativePath": "src/UniGetUI.Core.Data/CoreCredentialStore.cs",
+      "line": 15,
+      "column": 3,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "0d20097afa3583a9",
+      "relativePath": "src/UniGetUI.Core.Data/CoreCredentialStore.cs",
+      "line": 18,
+      "column": 43,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "40146e7200354111",
+      "relativePath": "src/UniGetUI.Core.Tools/Tools.cs",
+      "line": 263,
+      "column": 85,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "51bbbdb5f6c72f67",
+      "relativePath": "src/UniGetUI.Interface.Telemetry.Tests/TelemetryHandlerTests.cs",
+      "line": 18,
+      "column": 34,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "d0ef8a37220fe4eb",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Bun/Bun.cs",
+      "line": 352,
+      "column": 25,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "8d7b8c494cf78846",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Cargo/Helpers/CargoPkgDetailsHelper.cs",
+      "line": 61,
+      "column": 20,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "0ac0514abbb86112",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Cargo/Helpers/CargoPkgOperationHelper.cs",
+      "line": 46,
+      "column": 40,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT003",
+      "fingerprint": "1738dd8d2b16e3bb",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Chocolatey/Chocolatey.cs",
+      "line": 162,
+      "column": 31,
+      "severity": "high"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "eeea00ae6f1ba28c",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Vcpkg/Helpers/VcpkgPkgDetailsHelper.cs",
+      "line": 55,
+      "column": 83,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "5d341ac4d6a94815",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Vcpkg/Helpers/VcpkgPkgDetailsHelper.cs",
+      "line": 59,
+      "column": 73,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "790c2742f0197f94",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Vcpkg/Vcpkg.cs",
+      "line": 105,
+      "column": 108,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "51efc61c157c2cfb",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.Vcpkg/Vcpkg.cs",
+      "line": 257,
+      "column": 7,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT020",
+      "fingerprint": "67b843a23ab0a4c6",
+      "relativePath": "src/UniGetUI.PackageEngine.Managers.WinGet/Helpers/WinGetPkgOperationHelper.cs",
+      "line": 265,
+      "column": 40,
+      "severity": "low"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "a32100ca1d771a66",
+      "relativePath": "src/UniGetUI.PackageEngine.Tests/Fixtures/Bun/installed.txt",
+      "line": 1,
+      "column": 1,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT010",
+      "fingerprint": "5e945a8072e8b087",
+      "relativePath": "src/UniGetUI.PackageEngine.Tests/Fixtures/Scoop/bucket-list-output.txt",
+      "line": 4,
+      "column": 6,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "9f9ba0d22f2adc4b",
+      "relativePath": "src/UniGetUI.PackageEngine.Tests/Infrastructure/Fakes/TestPackageManager.cs",
+      "line": 11,
+      "column": 8,
+      "severity": "medium"
+    },
+    {
+      "ruleId": "ACKIT005",
+      "fingerprint": "c8096cd508eea717",
+      "relativePath": "src/UniGetUI.PackageEngine.Tests/Infrastructure/Fakes/TestPackageManager.cs",
+      "line": 111,
+      "column": 14,
+      "severity": "medium"
+    }
+  ]
+}
