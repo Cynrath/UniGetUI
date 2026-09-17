@@ -417,9 +417,16 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
         EnforcementRows.Add(Row("Rule precedence", TranslateEnum(policy.Enforcement.RulePrecedence)));
         EnforcementRows.Add(Row("Audit mode", FormatNullableBoolean(policy.Enforcement.AuditMode)));
 
-        for (int index = 0; index < policy.Rules.Count; index++)
+        PolicyRule[] orderedRules = policy.Rules
+            .Select((rule, sourceIndex) => (Rule: rule, SourceIndex: sourceIndex))
+            .OrderBy(item => item.Rule.Priority)
+            .ThenBy(item => item.Rule.Decision == PolicyDecision.Deny ? 0 : 1)
+            .ThenBy(item => item.SourceIndex)
+            .Select(item => item.Rule)
+            .ToArray();
+        for (int index = 0; index < orderedRules.Length; index++)
         {
-            Rules.Add(BuildRule(policy.Rules[index], index));
+            Rules.Add(BuildRule(orderedRules[index], index));
         }
 
         RawJson = canonicalJson;
@@ -437,14 +444,14 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
             AutomationName = CoreTools.Translate("Rule {0}: {1}", index + 1, Value(rule.Id)),
             Id = Value(rule.Id),
             Enabled = FormatBoolean(rule.Enabled),
-            Priority = rule.Priority.ToString(CultureInfo.CurrentCulture),
+            Priority = (index + 1).ToString(CultureInfo.CurrentCulture),
             Decision = TranslateEnum(rule.Decision),
             Reason = Value(rule.Reason),
             MatchRows =
             [
                 Row("Operations", FormatEnumList<PolicyOperation>(match.Operations)),
                 Row("Package managers", FormatEnumList<PolicyManagerName>(match.Managers)),
-                Row("Sources", FormatList(match.Sources, anyWhenEmpty: true)),
+                Row("Source names", FormatList(match.Sources, anyWhenEmpty: true)),
                 Row("Package identifiers", FormatList(match.PackageIdentifiers, anyWhenEmpty: true)),
                 Row("Package names", FormatList(match.PackageNames, anyWhenEmpty: true)),
                 Row("Versions", FormatList(match.Versions, anyWhenEmpty: true)),
@@ -455,11 +462,11 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
                 Row("Interactive", FormatBooleanList(match.Interactive)),
                 Row("Skip hash check", FormatBooleanList(match.SkipHashCheck)),
                 Row("Prerelease", FormatBooleanList(match.PreRelease)),
-                Row("Has custom parameters", FormatBooleanList(match.HasCustomParameters)),
-                Row("Has custom install location", FormatBooleanList(match.HasCustomInstallLocation)),
-                Row("Has pre/post commands", FormatBooleanList(match.HasPrePostCommands)),
-                Row("Has kill-before-operation", FormatBooleanList(match.HasKillBeforeOperation)),
-                Row("Has uninstall previous", FormatBooleanList(match.HasUninstallPrevious)),
+                Row("Custom parameters", FormatBooleanList(match.HasCustomParameters)),
+                Row("Custom install location", FormatBooleanList(match.HasCustomInstallLocation)),
+                Row("Pre/post commands", FormatBooleanList(match.HasPrePostCommands)),
+                Row("Stop running apps before operation", FormatBooleanList(match.HasKillBeforeOperation)),
+                Row("Uninstall previous version", FormatBooleanList(match.HasUninstallPrevious)),
             ],
             ConstraintRows = constraints is null
                 ? [Row("Constraints", CoreTools.Translate("Not set"))]
@@ -502,7 +509,7 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
         "Audit mode" => PolicyEditorHelp.AuditMode,
         "Operations" => PolicyEditorHelp.Operations,
         "Package managers" => PolicyEditorHelp.Managers,
-        "Sources" => PolicyEditorHelp.Sources,
+        "Source names" => PolicyEditorHelp.Sources,
         "Package identifiers" => PolicyEditorHelp.PackageIdentifiers,
         "Package names" => PolicyEditorHelp.PackageNames,
         "Versions" => PolicyEditorHelp.Versions,
@@ -513,11 +520,11 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
         "Interactive" => PolicyEditorHelp.InteractiveMatch,
         "Skip hash check" => PolicyEditorHelp.SkipHashMatch,
         "Prerelease" => PolicyEditorHelp.PrereleaseMatch,
-        "Has custom parameters" => PolicyEditorHelp.CustomParametersMatch,
-        "Has custom install location" => PolicyEditorHelp.CustomLocationMatch,
-        "Has pre/post commands" => PolicyEditorHelp.PrePostCommandsMatch,
-        "Has kill-before-operation" => PolicyEditorHelp.KillBeforeMatch,
-        "Has uninstall previous" => PolicyEditorHelp.UninstallPreviousMatch,
+        "Custom parameters" => PolicyEditorHelp.CustomParametersMatch,
+        "Custom install location" => PolicyEditorHelp.CustomLocationMatch,
+        "Pre/post commands" => PolicyEditorHelp.PrePostCommandsMatch,
+        "Stop running apps before operation" => PolicyEditorHelp.KillBeforeMatch,
+        "Uninstall previous version" => PolicyEditorHelp.UninstallPreviousMatch,
         "Constraints" => PolicyEditorHelp.Constraints,
         "Allow interactive" => PolicyEditorHelp.AllowInteractive,
         "Allow skip hash check" => PolicyEditorHelp.AllowSkipHashCheck,
@@ -545,8 +552,13 @@ public partial class AgentPolicyInspectorViewModel : ViewModelBase, IDisposable
     private static string FormatNullableBoolean(bool? value) =>
         value.HasValue ? FormatBoolean(value.Value) : CoreTools.Translate("Not set");
 
-    private static string FormatBooleanList(IEnumerable<bool> values) =>
-        FormatList(values.Select(FormatBoolean), anyWhenEmpty: true);
+    private static string FormatBooleanList(IEnumerable<bool> values)
+    {
+        string[] formatted = values.Select(FormatBoolean).ToArray();
+        return formatted.Length == 0
+            ? CoreTools.Translate("Does not matter")
+            : string.Join(", ", formatted);
+    }
 
     private static string FormatEnumList<T>(IEnumerable<T> values) where T : struct, Enum =>
         FormatList(values.Select(TranslateEnum), anyWhenEmpty: true);

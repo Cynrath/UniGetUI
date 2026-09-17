@@ -67,7 +67,7 @@ public class AgentPolicyInspectorViewModelTests
 
         PolicyDetailRow publisher = viewModel.MetadataRows.Single(row => row.Label == "Publisher");
         PolicyDetailRow description = viewModel.MetadataRows.Single(row => row.Label == "Description");
-        PolicyDetailRow sources = viewModel.Rules[0].MatchRows.Single(row => row.Label == "Sources");
+        PolicyDetailRow sources = viewModel.Rules[0].MatchRows.Single(row => row.Label == "Source names");
         PolicyDetailRow customParameters = viewModel.Rules[0].ConstraintRows.Single(
             row => row.Label == "Allowed custom parameters");
         Assert.Equal(" ", publisher.Value);
