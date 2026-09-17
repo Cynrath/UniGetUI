@@ -65,14 +65,14 @@ Integrate ACKit 0.5.2 into UniGetUI as a first-class repository workflow from cl
 
 ## Acceptance criteria
 
-- [ ] Clean `origin/main` base, separate branch, no PR #5390 contamination
-- [ ] `ackit init` real, `ackit.yml` valid
-- [ ] `AGENTS.md` repo-specific, instruction graph clean
-- [ ] Custom skills validated, strict issue fixed or proven ACKit bug
-- [ ] Policy/config pass, readiness improves, pack validated
-- [ ] CI added, docs added, no secrets/absolute paths
-- [ ] Dogfood findings classified
-- [ ] Final diff reviewed, evidence synchronized
+- [x] Clean `origin/main` base, separate branch, no PR #5390 contamination
+- [x] `ackit init` real, `ackit.yml` valid
+- [x] `AGENTS.md` repo-specific, instruction graph validated (expected shim shadowing documented)
+- [x] Custom skills validated, strict issue fixed as stale relative path
+- [x] Policy/config pass, readiness stable with doctor pass, pack validated
+- [x] CI added, docs added, no secrets/absolute paths
+- [x] Dogfood findings classified
+- [x] Final diff reviewed, evidence synchronized (push + review remain)
 
 ## Test steps
 
@@ -92,4 +92,12 @@ Focused commit revert on `chore/ackit-integration`; never touch `main` or `featu
 
 ## Completion notes
 
-In progress. Baseline captured 2026-09-17 on 57585652.
+2026-09-17, branch `chore/ackit-integration` (cb30b3ff + evidence), base `origin/main` 57585652, ACKit 0.5.2, Node v24.13.0.
+
+Before (clean origin/main): 1010 files, 71 findings (7 high / 57 medium / 7 low); readiness 89 (Inst 90, Sec 90, Ctx 70, Task 100, Skills 100, Policy 100); skills 6 with 1 strict (`translation-source-sync` ref `src/Languages/lang_en.json`); doctor 1 failed; sync 2 refused + 4 would-create; instructions 8 nodes; tasks 0 active; optimize 2 suggestions.
+
+After (3 commits): 1032 files (+22), 74 findings (+3, all ACKIT070 mutable-pin on new `.github/workflows/ackit.yml`, repo-policy consistent, SHAs not guessed); readiness 89 stable (strict pass); skills 16, 0 issues; doctor ALL PASS; sync all up-to-date; instructions 20 nodes; tasks 1 active; optimize 1 suggestion; `scan --changed` 0 files/0 findings; `scan --staged` 0/0; `scan --changed --ci` on workflow commit showed the 3 mediums (visible regression signal).
+
+Exact gates: `ackit config check` OK (digest b6faab36d972); `ackit policy check` OK chain 0; `ackit skills validate` 16 OK; `ackit task doctor` OK; `ackit scan --ci` exit 1 (pre-existing threshold, baseline documents); `ackit readiness` 89 pass; `ackit readiness --strict` exit 0; `ackit optimize --explain` 1 low; `ackit diagnostics --json` ok (20 instructions, 1 active task); `ackit pack --profile codex --max-tokens 50000` 50000/50000 with TASK-0001; `ackit instructions --explain` 20 nodes, expected copilot-shim shadowing + translation cycle diagnostic; `dotnet format whitespace src --folder --verify-no-changes` pass (no output); full `dotnet test`/publish not run (no C# changes).
+
+Commits: 0dc030a0 chore init, 6bb9efb0 docs skills, cb30b3ff ci workflow. PR #5390 branch cb18d904 untouched; local main 38bbfbbe untouched, never pushed. Localization evaluated: 6 translation skills reused, no duplicate generic skill. No ACKit product changes (no separate repo work justified beyond documentation-gap findings).
