@@ -1,0 +1,22 @@
+# ACKit repository configuration for UniGetUI.
+# Validated with: ackit config check
+# Docs: docs/ACKIT.md
+schemaVersion: 1
+scan:
+  severityThreshold: low
+  exclude:
+    - "**/bin/**"
+    - "**/obj/**"
+    - "**/out/**"
+    - "**/outpublish/**"
+    - "generated/**"
+context:
+  maxTokens: 50000
+readiness:
+  strictThreshold: 80
+workflow:
+  defaultProfile: standard
+policy:
+  rulePacks:
+    - .agents/policy/unigetui-policy.json
+baseline: docs/ackit/scan-baseline.json
