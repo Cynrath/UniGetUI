@@ -1,0 +1,32 @@
+{
+  "schemaVersion": 1,
+  "packId": "unigetui-policy",
+  "namespace": "unigetui",
+  "version": "1.0.0",
+  "displayName": "UniGetUI repository policy",
+  "description": "Deterministic presence checks for ACKit workflow, instructions, and localization guidance.",
+  "severity": "medium",
+  "rules": [
+    {
+      "id": "unigetui:ackit-config",
+      "type": "presence",
+      "glob": "ackit.yml",
+      "message": "ackit.yml must exist at repository root",
+      "remediation": "Restore ackit.yml and run ackit config check"
+    },
+    {
+      "id": "unigetui:agents-instructions",
+      "type": "presence",
+      "glob": "AGENTS.md",
+      "message": "AGENTS.md must exist at repository root",
+      "remediation": "Restore AGENTS.md canonical instructions"
+    },
+    {
+      "id": "unigetui:ackit-docs",
+      "type": "presence",
+      "glob": "docs/ACKIT.md",
+      "message": "docs/ACKIT.md must exist for contributor and agent guidance",
+      "remediation": "Restore docs/ACKIT.md"
+    }
+  ]
+}

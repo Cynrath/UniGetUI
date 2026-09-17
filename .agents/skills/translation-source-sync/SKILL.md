@@ -5,7 +5,7 @@ description: Synchronizes the UniGetUI English language file with source-code us
 
 # translation source sync
 
-Use this skill when UniGetUI source code changed and you need to keep [src/Languages/lang_en.json](src/Languages/lang_en.json) aligned with the strings actually used by the application, or when you need downstream locale files reordered to match the English key ordering.
+Use this skill when UniGetUI source code changed and you need to keep [src/Languages/lang_en.json](../../../src/Languages/lang_en.json) aligned with the strings actually used by the application, or when you need downstream locale files reordered to match the English key ordering.
 
 It scans supported C#, WinUI XAML, and Avalonia AXAML patterns, finds missing English keys, removes unused entries, reports translation-source warnings that still need manual cleanup, and can align locale file ordering to the English layout.
 
