@@ -70,6 +70,12 @@ public sealed partial class OperationViewModel : ViewModelBase
     // formatted (speed-bearing) text survives the reset.
     private string _lastLogLine = "";
 
+    // True only while a determinate structured report owns the status line. Raw
+    // per-frame progress text is gated out solely in that case; in every other
+    // state (queue, indeterminate, terminal, or no report ever received) log lines
+    // flow to the card exactly as before, so status/queue lines are never hidden.
+    private bool _determinateProgressActive;
+
     public OperationViewModel(AbstractOperation operation)
     {
         Operation = operation;
@@ -95,7 +101,7 @@ public sealed partial class OperationViewModel : ViewModelBase
                 // ProgressIndicator lines, so this changes display only.)
                 if (
                     ev.Item2 is AbstractOperation.LineType.ProgressIndicator
-                    && !_card.IsIndeterminate
+                    && _determinateProgressActive
                 )
                     return;
                 _card = _card with { LiveLine = ev.Item1 };
@@ -107,6 +113,9 @@ public sealed partial class OperationViewModel : ViewModelBase
             Dispatcher.UIThread.Post(() =>
             {
                 _card = _card.WithProgress(Operation.Status, progress);
+                _determinateProgressActive =
+                    Operation.Status is OperationStatus.Running
+                    && progress?.IsDeterminate is true;
                 ProgressIndeterminate = _card.IsIndeterminate;
                 ProgressValue = _card.Value;
                 if (progress is null || progress.Stage is OperationProgressStage.Unknown)
@@ -196,6 +205,10 @@ public sealed partial class OperationViewModel : ViewModelBase
     private void ApplyStatus(OperationStatus status)
     {
         _card = _card.WithStatus(status);
+        // Determinate ownership ends with the running phase; afterwards log lines
+        // (e.g. the success/failure message) own the status line again.
+        _determinateProgressActive =
+            status is OperationStatus.Running && _determinateProgressActive;
         ProgressIndeterminate = _card.IsIndeterminate;
         ProgressValue = _card.Value;
         switch (status)
