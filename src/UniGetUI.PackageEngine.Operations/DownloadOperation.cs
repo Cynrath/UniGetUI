@@ -53,6 +53,7 @@ public class DownloadOperation : AbstractOperation
         try
         {
             CancellationToken.ThrowIfCancellationRequested();
+            ReportProgress(OperationProgress.ForStage(OperationProgressStage.Downloading));
             Line(
                 $"Fetching download url for package {_package.Name} from {_package.Manager.DisplayName}...",
                 LineType.Information
@@ -121,6 +122,9 @@ public class DownloadOperation : AbstractOperation
                     if (canReportProgress)
                     {
                         var progress = (int)((totalRead * 100L) / totalBytes);
+                        ReportProgress(
+                            OperationProgress.FromDownload((ulong)totalRead, (ulong)totalBytes)
+                        );
                         if (progress != oldProgress)
                         {
                             oldProgress = progress;

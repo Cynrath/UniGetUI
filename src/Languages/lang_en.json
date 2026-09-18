@@ -1088,5 +1088,13 @@
   "Reset the default installer download location": "Reset the default installer download location",
   "Open the default installer download location": "Open the default installer download location",
   "{pm} could not be loaded": "{pm} could not be loaded",
-  "{pm} was found on your system, but it could not be started. Check the UniGetUI log for more details.": "{pm} was found on your system, but it could not be started. Check the UniGetUI log for more details."
+  "{pm} was found on your system, but it could not be started. Check the UniGetUI log for more details.": "{pm} was found on your system, but it could not be started. Check the UniGetUI log for more details.",
+  "Downloading": "Downloading",
+  "Downloading...": "Downloading...",
+  "Installing": "Installing",
+  "Installing...": "Installing...",
+  "Updating": "Updating",
+  "Updating...": "Updating...",
+  "Uninstalling": "Uninstalling",
+  "Uninstalling...": "Uninstalling..."
 }
