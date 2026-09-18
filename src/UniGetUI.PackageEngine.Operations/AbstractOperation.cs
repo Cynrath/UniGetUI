@@ -760,6 +760,7 @@ public abstract partial class AbstractOperation : IDisposable
 
         scheduledRetry?.TrySetCanceled();
         Cancel();
+        DisposeStaleSpeedTimer();
         if (!IsExecutingOperation)
         {
             while (OperationQueue.Remove(this))

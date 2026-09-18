@@ -57,24 +57,12 @@ public sealed partial class OperationViewModel : ViewModelBase
     private static readonly Uri _fallbackIconUri =
         new("avares://UniGetUI/Assets/package_color.png");
 
-    // Pure mapping backing the progress visuals; the only UI-thread-owned copy.
-    // All event handlers below run on the UI thread via Dispatcher.UIThread.Post.
-    private OperationCardProgressState _card = new(
-        IsIndeterminate: false,
-        Value: 0,
-        LiveLine: ""
-    );
-
-    // Last log-driven status line. Structured determinate progress temporarily owns
-    // LiveLine; a plain Unknown reset (retry/restart) restores this so no stale
-    // formatted (speed-bearing) text survives the reset.
-    private string _lastLogLine = "";
-
-    // True only while a determinate structured report owns the status line. Raw
-    // per-frame progress text is gated out solely in that case; in every other
-    // state (queue, indeterminate, terminal, or no report ever received) log lines
-    // flow to the card exactly as before, so status/queue lines are never hidden.
-    private bool _determinateProgressActive;
+    // Progress display state machine; the only UI-thread-owned copy.
+    // All event handlers below run on the UI thread via Dispatcher.UIThread.Post,
+    // which is FIFO at the same priority. That ordering is load-bearing on the
+    // failure path: Status=Failed clears determinate ownership before the failure
+    // line arrives, so the failure message is never swallowed.
+    private readonly OperationCardController _controller = new();
 
     public OperationViewModel(AbstractOperation operation)
     {
@@ -99,29 +87,22 @@ public sealed partial class OperationViewModel : ViewModelBase
                 // Structured determinate progress owns the status line: raw per-frame
                 // progress text must not clobber it. (History already excludes
                 // ProgressIndicator lines, so this changes display only.)
-                if (
-                    ev.Item2 is AbstractOperation.LineType.ProgressIndicator
-                    && _determinateProgressActive
-                )
-                    return;
-                _card = _card with { LiveLine = ev.Item1 };
-                _lastLogLine = ev.Item1;
-                LiveLine = ev.Item1;
+                if (_controller.TryApplyLogLine(ev.Item1, ev.Item2, out string liveLine))
+                {
+                    LiveLine = liveLine;
+                }
             });
 
         operation.ProgressChanged += (_, progress) =>
             Dispatcher.UIThread.Post(() =>
             {
-                _card = _card.WithProgress(Operation.Status, progress);
-                _determinateProgressActive =
-                    Operation.Status is OperationStatus.Running
-                    && progress?.IsDeterminate is true;
-                ProgressIndeterminate = _card.IsIndeterminate;
-                ProgressValue = _card.Value;
-                if (progress is null || progress.Stage is OperationProgressStage.Unknown)
-                    LiveLine = _lastLogLine;
-                else
-                    LiveLine = _card.LiveLine;
+                var (isIndeterminate, value, liveLine) = _controller.ApplyProgress(
+                    Operation.Status,
+                    progress
+                );
+                ProgressIndeterminate = isIndeterminate;
+                ProgressValue = value;
+                LiveLine = liveLine;
             });
 
         operation.StatusChanged += (_, status) =>
@@ -154,14 +135,17 @@ public sealed partial class OperationViewModel : ViewModelBase
                     ));
             });
 
-        // Sync with current status in case the operation already started
-        _card = _card with { LiveLine = _liveLine };
-        _lastLogLine = _liveLine;
-        ApplyStatus(operation.Status);
-        _card = _card.WithProgress(operation.Status, operation.CurrentProgress);
-        ProgressIndeterminate = _card.IsIndeterminate;
-        ProgressValue = _card.Value;
-        LiveLine = _card.LiveLine;
+        // Sync with current status in case the operation already started. The
+        // controller derives card, last log line, and determinate ownership from the
+        // same snapshot so a mid-download card starts in the formatted state.
+        // Note: SyncInitial already applies the status to the controller, so only
+        // the brush/menu visuals still need syncing here (a second ApplyStatus would
+        // flip a determinate Running card back to indeterminate).
+        _controller.SyncInitial(_liveLine, operation.Status, operation.CurrentProgress);
+        ProgressIndeterminate = _controller.Card.IsIndeterminate;
+        ProgressValue = _controller.Card.Value;
+        LiveLine = _controller.Card.LiveLine;
+        ApplyStatusVisuals(operation.Status);
     }
 
     // ── Icon loading ──────────────────────────────────────────────────────────
@@ -204,13 +188,16 @@ public sealed partial class OperationViewModel : ViewModelBase
     // ── Status → visual properties ────────────────────────────────────────────
     private void ApplyStatus(OperationStatus status)
     {
-        _card = _card.WithStatus(status);
         // Determinate ownership ends with the running phase; afterwards log lines
         // (e.g. the success/failure message) own the status line again.
-        _determinateProgressActive =
-            status is OperationStatus.Running && _determinateProgressActive;
-        ProgressIndeterminate = _card.IsIndeterminate;
-        ProgressValue = _card.Value;
+        _controller.ApplyStatus(status);
+        ProgressIndeterminate = _controller.Card.IsIndeterminate;
+        ProgressValue = _controller.Card.Value;
+        ApplyStatusVisuals(status);
+    }
+
+    private void ApplyStatusVisuals(OperationStatus status)
+    {
         switch (status)
         {
             case OperationStatus.InQueue:

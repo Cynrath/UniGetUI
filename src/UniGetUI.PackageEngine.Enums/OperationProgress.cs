@@ -60,39 +60,6 @@ namespace UniGetUI.PackageEngine.Enums
                 );
 
         /// <summary>
-        /// Install progress from an explicitly reported percentage. Null, non-finite, or
-        /// negative values mean the installer supplied no usable progress and map to
-        /// indeterminate rather than a fake number.
-        /// </summary>
-        public static OperationProgress FromInstall(double? percent) =>
-            FromStagePercent(OperationProgressStage.Installing, percent);
-
-        /// <summary>
-        /// Update progress from an explicitly reported percentage. Same unknown semantics
-        /// as <see cref="FromInstall"/>.
-        /// </summary>
-        public static OperationProgress FromUpdate(double? percent) =>
-            FromStagePercent(OperationProgressStage.Updating, percent);
-
-        /// <summary>
-        /// Uninstall progress from an explicitly reported percentage. Same unknown semantics
-        /// as <see cref="FromInstall"/>.
-        /// </summary>
-        public static OperationProgress FromUninstall(double? percent) =>
-            FromStagePercent(OperationProgressStage.Uninstalling, percent);
-
-        private static OperationProgress FromStagePercent(
-            OperationProgressStage stage,
-            double? percent
-        ) =>
-            percent is { } value
-            && !double.IsNaN(value)
-            && !double.IsInfinity(value)
-            && value >= 0
-                ? new(stage, Math.Min(value, 100.0), null, null, null)
-                : new(stage, null, null, null, null);
-
-        /// <summary>
         /// True only for a real, finite percentage. Unknown progress is never zero.
         /// </summary>
         public bool IsDeterminate =>

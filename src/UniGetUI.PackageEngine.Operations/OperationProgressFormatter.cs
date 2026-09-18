@@ -6,11 +6,11 @@ namespace UniGetUI.PackageOperations;
 /// <summary>
 /// Formats a generic <see cref="OperationProgress"/> for operation cards, log lines,
 /// and screen-reader status. Unknown progress maps to a short stage label
-/// (indeterminate); determinate progress appends percent and, when available,
-/// human-readable byte counters plus the measured download throughput
-/// (e.g. "Downloading · 21% · 10.0 MB / 46.7 MB · 1.2 MB/s"). No ETA is shown.
-/// Size units reuse <see cref="CoreTools.FormatAsSize"/> conventions; stage labels go
-/// through <see cref="CoreTools.Translate"/> like every other user-facing string.
+/// (indeterminate); determinate progress uses translatable positional templates so
+/// translators control ordering, separators, and placement (e.g.
+/// "{0} · {1}% · {2} / {3} · {4}"). No ETA is shown.
+/// Size units reuse <see cref="CoreTools.FormatAsSize"/> conventions; stage labels and
+/// the composed templates go through <see cref="CoreTools.Translate"/>.
 /// </summary>
 public static class OperationProgressFormatter
 {
@@ -28,13 +28,31 @@ public static class OperationProgressFormatter
             && progress.BytesTotal.Value > 0
         )
         {
-            string text =
-                $"{label} · {percent}% · {FormatBytes(progress.BytesDownloaded.Value)} / {FormatBytes(progress.BytesTotal.Value)}";
+            string downloaded = CoreTools.FormatAsSize((long)progress.BytesDownloaded.Value);
+            string total = CoreTools.FormatAsSize((long)progress.BytesTotal.Value);
             string? throughput = FormatThroughput(progress.BytesPerSecond);
-            return throughput is null ? text : $"{text} · {throughput}";
+            if (throughput is null)
+            {
+                return CoreTools.Translate(
+                    "{0} · {1}% · {2} / {3}",
+                    label,
+                    percent,
+                    downloaded,
+                    total
+                );
+            }
+
+            return CoreTools.Translate(
+                "{0} · {1}% · {2} / {3} · {4}",
+                label,
+                percent,
+                downloaded,
+                total,
+                throughput
+            );
         }
 
-        return $"{label} · {percent}%";
+        return CoreTools.Translate("{0} · {1}%", label, percent);
     }
 
     public static string StageLabel(OperationProgressStage stage) =>
@@ -50,17 +68,15 @@ public static class OperationProgressFormatter
     private static string IndeterminateLabel(OperationProgressStage stage) =>
         stage switch
         {
-            OperationProgressStage.Downloading => CoreTools.Translate("Downloading..."),
-            OperationProgressStage.Installing => CoreTools.Translate("Installing..."),
-            OperationProgressStage.Updating => CoreTools.Translate("Updating..."),
-            OperationProgressStage.Uninstalling => CoreTools.Translate("Uninstalling..."),
+            OperationProgressStage.Downloading
+            or OperationProgressStage.Installing
+            or OperationProgressStage.Updating
+            or OperationProgressStage.Uninstalling => CoreTools.Translate(
+                "{0}...",
+                StageLabel(stage)
+            ),
             _ => CoreTools.Translate("Please wait..."),
         };
-
-    private static string FormatBytes(ulong value) =>
-        value > (ulong)long.MaxValue
-            ? $"{value / 1099511627776.0:F1} TB"
-            : CoreTools.FormatAsSize((long)value);
 
     /// <summary>
     /// Formats a measured throughput reusing <see cref="CoreTools.FormatAsSize"/> units

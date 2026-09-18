@@ -5,9 +5,12 @@ namespace UniGetUI.PackageOperations;
 /// <summary>
 /// Pure, UI-framework-agnostic mapping from operation status plus generic
 /// <see cref="OperationProgress"/> to operation-card progress visuals.
-/// Extracted from <c>OperationViewModel</c> so the determinate/indeterminate contract is
-/// unit-testable without Avalonia. This type never touches the dispatcher or any UI
-/// control; the ViewModel remains the only UI-thread owner and copies
+/// This is one input to the card visuals, not the full source of truth:
+/// <c>OperationViewModel</c> additionally owns log-line restoration
+/// (<c>_lastLogLine</c>), determinate ownership gating
+/// (<c>_determinateProgressActive</c>), and dispatcher ordering, which are covered
+/// by ViewModel state-machine tests. This type never touches the dispatcher or any
+/// UI control; the ViewModel remains the only UI-thread owner and copies
 /// <see cref="IsIndeterminate"/>, <see cref="Value"/>, and <see cref="LiveLine"/> onto
 /// its bindable properties.
 /// </summary>

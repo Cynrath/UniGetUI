@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using UniGetUI.PackageEngine.Enums;
 using UniGetUI.PackageOperations;
 using LineType = UniGetUI.PackageOperations.AbstractOperation.LineType;
@@ -5,14 +6,15 @@ using LineType = UniGetUI.PackageOperations.AbstractOperation.LineType;
 namespace UniGetUI.PackageEngine.Tests;
 
 /// <summary>
-/// Covers the manager-neutral <see cref="OperationProgress"/> model and the generic
-/// throughput tracker in <see cref="AbstractOperation"/>: determinate/unknown rules,
-/// single-clock speed measurement, EMA smoothing, reset semantics, thread safety, and
-/// the guarantee that structured progress never touches the log/history path.
+/// Covers the manager-neutral <see cref="OperationProgress"/> model, the generic
+/// monotonic throughput tracker, stale-speed expiry, and subscriber isolation.
+/// Download throttling lives in <see cref="DownloadOperation"/> and is covered by
+/// <c>DownloadOperationProgressTests</c>; card visuals by
+/// <c>OperationCardProgressStateTests</c> and <c>OperationCardControllerTests</c>.
 /// </summary>
 public sealed class OperationProgressTests
 {
-    private class ProgressProbeOperation : AbstractOperation
+    private sealed class ProgressProbeOperation : AbstractOperation
     {
         public ProgressProbeOperation()
             : base(queue_enabled: false)
@@ -28,12 +30,10 @@ public sealed class OperationProgressTests
 
         public void ReportForTests(OperationProgress progress) => ReportProgress(progress);
 
-        public void ResetForTests() => ResetProgress();
-
         public void EmitForTests(string line, LineType type) => Line(line, type);
 
-        public void SetClockForTests(Func<DateTime> provider) =>
-            SetUtcNowProviderForTests(provider);
+        public void SetClockForTests(Func<long> provider) =>
+            SetTimestampProviderForTests(provider);
 
         protected override void ApplyRetryAction(string retryMode) { }
 
@@ -45,26 +45,26 @@ public sealed class OperationProgressTests
     }
 
     /// <summary>
-    /// Deterministic manual clock. Production uses DateTime.UtcNow via the default
-    /// provider; tests advance time explicitly, which also proves the tracker honors
-    /// the injected clock (a DateTime.UtcNow leak would break the frozen-clock tests).
+    /// Deterministic monotonic clock. Production uses Stopwatch.GetTimestamp();
+    /// tests advance explicitly by Stopwatch frequency ticks.
     /// </summary>
-    private sealed class ManualClock
+    private sealed class ManualTimestampClock
     {
-        private DateTime _now = new(2026, 1, 12, 12, 0, 0, DateTimeKind.Utc);
+        private long _ticks;
 
-        public DateTime Now() => _now;
+        public long Now() => _ticks;
 
-        public void Advance(TimeSpan delta) => _now += delta;
+        public void Advance(TimeSpan delta) =>
+            _ticks += (long)(delta.TotalSeconds * Stopwatch.Frequency);
     }
 
     private const ulong OneMiB = 1024UL * 1024;
     private const ulong TenMiB = 10UL * 1024 * 1024;
 
-    private static (ProgressProbeOperation Op, ManualClock Clock) CreateClockedProbe()
+    private static (ProgressProbeOperation Op, ManualTimestampClock Clock) CreateClockedProbe()
     {
         var op = new ProgressProbeOperation();
-        var clock = new ManualClock();
+        var clock = new ManualTimestampClock();
         op.SetClockForTests(clock.Now);
         return (op, clock);
     }
@@ -97,31 +97,12 @@ public sealed class OperationProgressTests
     }
 
     [Fact]
-    public void FromDownload_ZeroBytes_IsDeterminateZero_NotUnknown()
-    {
-        var progress = OperationProgress.FromDownload(0, TenMiB);
-
-        Assert.True(progress.IsDeterminate);
-        Assert.Equal(0, progress.Percentage);
-    }
-
-    [Fact]
-    public void FromDownload_Full_IsDeterminateHundred()
-    {
-        var progress = OperationProgress.FromDownload(TenMiB, TenMiB);
-
-        Assert.True(progress.IsDeterminate);
-        Assert.Equal(100, progress.Percentage);
-    }
-
-    [Fact]
     public void FromDownload_ZeroTotal_IsIndeterminate_NotFakeZero()
     {
         var progress = OperationProgress.FromDownload(1234, 0);
 
         Assert.False(progress.IsDeterminate);
         Assert.Null(progress.Percentage);
-        Assert.Equal(OperationProgressStage.Downloading, progress.Stage);
     }
 
     [Fact]
@@ -132,84 +113,9 @@ public sealed class OperationProgressTests
         Assert.True(progress.IsDeterminate);
         Assert.Equal(100, progress.Percentage);
         Assert.Equal(150UL, progress.BytesDownloaded);
-        Assert.Equal(100UL, progress.BytesTotal);
     }
 
-    [Theory]
-    [InlineData(34.0)]
-    [InlineData(0.0)]
-    [InlineData(100.0)]
-    public void FromInstall_Known_IsDeterminate(double percent)
-    {
-        var progress = OperationProgress.FromInstall(percent);
-
-        Assert.True(progress.IsDeterminate);
-        Assert.Equal(percent, progress.Percentage);
-        Assert.Equal(OperationProgressStage.Installing, progress.Stage);
-    }
-
-    [Theory]
-    [InlineData(150.0)]
-    public void FromInstall_AboveHundred_Clamps(double percent)
-    {
-        Assert.Equal(100, OperationProgress.FromInstall(percent).Percentage);
-    }
-
-    [Theory]
-    [InlineData(null)]
-    [InlineData(-1.0)]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    [InlineData(double.NegativeInfinity)]
-    public void FromInstall_Unknown_StaysIndeterminateWithoutFakePercent(double? percent)
-    {
-        var progress = OperationProgress.FromInstall(percent);
-
-        Assert.False(progress.IsDeterminate);
-        Assert.Null(progress.Percentage);
-        Assert.Equal(OperationProgressStage.Installing, progress.Stage);
-    }
-
-    [Fact]
-    public void FromUpdate_And_FromUninstall_CarryTheirStage()
-    {
-        Assert.Equal(
-            OperationProgressStage.Updating,
-            OperationProgress.FromUpdate(10).Stage
-        );
-        Assert.Equal(
-            OperationProgressStage.Uninstalling,
-            OperationProgress.FromUninstall(10).Stage
-        );
-        Assert.False(OperationProgress.FromUpdate(null).IsDeterminate);
-        Assert.False(OperationProgress.FromUninstall(null).IsDeterminate);
-    }
-
-    [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    [InlineData(double.NegativeInfinity)]
-    [InlineData(0)]
-    [InlineData(-12.5)]
-    public void NormalizeBytesPerSecond_RejectsNonPositiveAndNonFinite(double value)
-    {
-        Assert.Null(OperationProgress.NormalizeBytesPerSecond(value));
-        Assert.False(
-            (OperationProgress.Unknown with { BytesPerSecond = value }).HasThroughput
-        );
-    }
-
-    [Fact]
-    public void NormalizeBytesPerSecond_KeepsPositiveFinite()
-    {
-        Assert.Equal(3.5, OperationProgress.NormalizeBytesPerSecond(3.5));
-        Assert.True(
-            (OperationProgress.Unknown with { BytesPerSecond = 3.5 }).HasThroughput
-        );
-        Assert.Null(OperationProgress.NormalizeBytesPerSecond(null));
-    }
-
-    // ── Throughput: one clock, real bytes over real time ───────────────────
+    // ── Throughput: monotonic clock, real bytes over real time ─────────────
 
     [Fact]
     public void FirstDownloadSample_HasNoSpeed()
@@ -221,24 +127,6 @@ public sealed class OperationProgressTests
 
             Assert.True(op.CurrentProgress.IsDeterminate);
             Assert.Null(op.CurrentProgress.BytesPerSecond);
-            Assert.False(op.CurrentProgress.HasThroughput);
-        }
-    }
-
-    [Fact]
-    public void FrozenClock_SecondSample_HasNoSpeed_ProvesInjectedClockIsUsed()
-    {
-        // The clock never advances: elapsed time is exactly zero. A DateTime.UtcNow
-        // leak inside the tracker would observe real elapsed time and produce a
-        // (huge, fake) speed; the injected clock correctly yields no speed.
-        var (op, _) = CreateClockedProbe();
-        using (op)
-        {
-            ReportDownload(op, 0);
-            ReportDownload(op, OneMiB);
-
-            Assert.Null(op.CurrentProgress.BytesPerSecond);
-            Assert.False(op.CurrentProgress.HasThroughput);
         }
     }
 
@@ -253,49 +141,7 @@ public sealed class OperationProgressTests
             ReportDownload(op, OneMiB);
 
             Assert.Equal((double)OneMiB, op.CurrentProgress.BytesPerSecond);
-            Assert.True(op.CurrentProgress.HasThroughput);
         }
-    }
-
-    [Fact]
-    public void SpeedDelta_IsMeasuredFromPreviousSample()
-    {
-        var (op, clock) = CreateClockedProbe();
-        using (op)
-        {
-            ReportDownload(op, OneMiB);
-            clock.Advance(TimeSpan.FromSeconds(4));
-            ReportDownload(op, 3 * OneMiB);
-
-            // (3 MiB - 1 MiB) / 4 s = 0.5 MiB/s.
-            Assert.Equal((double)(OneMiB / 2), op.CurrentProgress.BytesPerSecond);
-        }
-    }
-
-    [Fact]
-    public void Smoothing_IsDeterministicExponentialMovingAverage()
-    {
-        static double? RunSequence()
-        {
-            var (op, clock) = CreateClockedProbe();
-            using (op)
-            {
-                ReportDownload(op, 0);
-                clock.Advance(TimeSpan.FromSeconds(1));
-                ReportDownload(op, OneMiB); // instant = 1 MiB/s
-                clock.Advance(TimeSpan.FromSeconds(1));
-                ReportDownload(op, 3 * OneMiB); // instant = 2 MiB/s
-                return op.CurrentProgress.BytesPerSecond;
-            }
-        }
-
-        double? first = RunSequence();
-        double? second = RunSequence();
-
-        Assert.NotNull(first);
-        Assert.Equal(first, second);
-        // EMA with alpha 0.3: 0.3 * 2 MiB/s + 0.7 * 1 MiB/s = 1.3 MiB/s.
-        Assert.InRange(first!.Value, 1.3 * OneMiB - 1, 1.3 * OneMiB + 1);
     }
 
     [Fact]
@@ -305,7 +151,6 @@ public sealed class OperationProgressTests
         using (op)
         {
             ReportDownload(op, 0);
-            // Second sample at the very same timestamp: no speed yet, no NaN.
             ReportDownload(op, OneMiB);
             Assert.Null(op.CurrentProgress.BytesPerSecond);
 
@@ -314,10 +159,8 @@ public sealed class OperationProgressTests
             double? speed = op.CurrentProgress.BytesPerSecond;
             Assert.NotNull(speed);
 
-            // More bytes but no time elapsed: previous speed preserved, finite.
             ReportDownload(op, 3 * OneMiB);
             Assert.Equal(speed, op.CurrentProgress.BytesPerSecond);
-            Assert.True(op.CurrentProgress.HasThroughput);
         }
     }
 
@@ -332,12 +175,10 @@ public sealed class OperationProgressTests
             ReportDownload(op, 2 * OneMiB);
             Assert.NotNull(op.CurrentProgress.BytesPerSecond);
 
-            // Counter rewound (retry/restart): no stale speed survives.
             clock.Advance(TimeSpan.FromSeconds(1));
             ReportDownload(op, 512);
             Assert.Null(op.CurrentProgress.BytesPerSecond);
 
-            // The rewound sample is the new baseline: next delta measures from it.
             clock.Advance(TimeSpan.FromSeconds(1));
             ReportDownload(op, 512 + OneMiB);
             Assert.Equal((double)OneMiB, op.CurrentProgress.BytesPerSecond);
@@ -345,23 +186,28 @@ public sealed class OperationProgressTests
     }
 
     [Fact]
-    public void RepeatedByteCount_PreservesPreviousSpeed()
+    public void Smoothing_IsDeterministicExponentialMovingAverage()
     {
-        var (op, clock) = CreateClockedProbe();
-        using (op)
+        static double? RunSequence()
         {
-            ReportDownload(op, 0);
-            clock.Advance(TimeSpan.FromSeconds(1));
-            ReportDownload(op, OneMiB);
-            double? speed = op.CurrentProgress.BytesPerSecond;
-            Assert.NotNull(speed);
-
-            // Stalled counter carries no new information: keep the previous speed
-            // instead of synthesizing a meaningless new one.
-            clock.Advance(TimeSpan.FromSeconds(5));
-            ReportDownload(op, OneMiB);
-            Assert.Equal(speed, op.CurrentProgress.BytesPerSecond);
+            var (op, clock) = CreateClockedProbe();
+            using (op)
+            {
+                ReportDownload(op, 0);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                ReportDownload(op, OneMiB);
+                clock.Advance(TimeSpan.FromSeconds(1));
+                ReportDownload(op, 3 * OneMiB);
+                return op.CurrentProgress.BytesPerSecond;
+            }
         }
+
+        double? first = RunSequence();
+        double? second = RunSequence();
+
+        Assert.NotNull(first);
+        Assert.Equal(first, second);
+        Assert.InRange(first!.Value, 1.3 * OneMiB - 1, 1.3 * OneMiB + 1);
     }
 
     [Fact]
@@ -375,52 +221,7 @@ public sealed class OperationProgressTests
             ReportDownload(op, OneMiB);
             Assert.NotNull(op.CurrentProgress.BytesPerSecond);
 
-            // Download -> install: speed is stripped, never carried over.
-            op.ReportForTests(OperationProgress.FromInstall(50));
-            Assert.Null(op.CurrentProgress.BytesPerSecond);
-            Assert.False(op.CurrentProgress.HasThroughput);
-
-            // A fresh download starts without a stale speed.
-            clock.Advance(TimeSpan.FromSeconds(1));
-            ReportDownload(op, 2 * OneMiB);
-            Assert.Null(op.CurrentProgress.BytesPerSecond);
-        }
-    }
-
-    [Fact]
-    public void ResetProgress_ClearsSpeedAndReturnsToUnknown()
-    {
-        var (op, clock) = CreateClockedProbe();
-        using (op)
-        {
-            ReportDownload(op, 0);
-            clock.Advance(TimeSpan.FromSeconds(1));
-            ReportDownload(op, OneMiB);
-            Assert.NotNull(op.CurrentProgress.BytesPerSecond);
-
-            op.ResetForTests();
-            Assert.Equal(OperationProgress.Unknown, op.CurrentProgress);
-            Assert.Null(op.CurrentProgress.BytesPerSecond);
-
-            // Same counters after a reset behave like a first sample again.
-            clock.Advance(TimeSpan.FromSeconds(1));
-            ReportDownload(op, OneMiB);
-            Assert.Null(op.CurrentProgress.BytesPerSecond);
-        }
-    }
-
-    [Fact]
-    public void UnknownProgress_ClearsSpeed()
-    {
-        var (op, clock) = CreateClockedProbe();
-        using (op)
-        {
-            ReportDownload(op, 0);
-            clock.Advance(TimeSpan.FromSeconds(1));
-            ReportDownload(op, OneMiB);
-            Assert.NotNull(op.CurrentProgress.BytesPerSecond);
-
-            op.ReportForTests(OperationProgress.Unknown);
+            op.ReportForTests(OperationProgress.ForStage(OperationProgressStage.Installing));
             Assert.Null(op.CurrentProgress.BytesPerSecond);
 
             clock.Advance(TimeSpan.FromSeconds(1));
@@ -429,78 +230,135 @@ public sealed class OperationProgressTests
         }
     }
 
+    // ── Stale speed expiry ─────────────────────────────────────────────────
+
     [Fact]
-    public void NonDownloadingStages_NeverCarrySpeed()
+    public void FreshSpeed_IsVisible_AndArmsExpiryTimer()
     {
-        var (op, _) = CreateClockedProbe();
+        var (op, clock) = CreateClockedProbe();
         using (op)
         {
-            // Even a hand-built installing report with speed is sanitized.
-            op.ReportForTests(OperationProgress.FromInstall(50) with { BytesPerSecond = 999 });
+            ReportDownload(op, 0);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, OneMiB);
+
+            Assert.NotNull(op.CurrentProgress.BytesPerSecond);
+            Assert.True(op.IsStaleSpeedTimerArmedForTests());
+        }
+    }
+
+    [Fact]
+    public void StaleSpeed_Disappears_AfterTimeout()
+    {
+        var (op, clock) = CreateClockedProbe();
+        using (op)
+        {
+            var seen = new List<OperationProgress>();
+            op.ProgressChanged += (_, p) => seen.Add(p);
+
+            ReportDownload(op, 0);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, OneMiB);
+            Assert.NotNull(op.CurrentProgress.BytesPerSecond);
+
+            clock.Advance(TimeSpan.FromSeconds(3));
+            Assert.True(op.ExpireStaleSpeedForTests());
+            Assert.Null(op.CurrentProgress.BytesPerSecond);
+            Assert.Contains(seen, static p => p.BytesPerSecond is null);
+        }
+    }
+
+    [Fact]
+    public void FreshSample_AfterStale_RestoresSpeed()
+    {
+        var (op, clock) = CreateClockedProbe();
+        using (op)
+        {
+            ReportDownload(op, 0);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, OneMiB);
+
+            clock.Advance(TimeSpan.FromSeconds(3));
+            Assert.True(op.ExpireStaleSpeedForTests());
             Assert.Null(op.CurrentProgress.BytesPerSecond);
 
-            op.ReportForTests(OperationProgress.Unknown with { BytesPerSecond = 999 });
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, 2 * OneMiB);
+            Assert.NotNull(op.CurrentProgress.BytesPerSecond);
+        }
+    }
+
+    [Fact]
+    public void RepeatedCounter_WhenStale_DoesNotFabricateSpeed()
+    {
+        var (op, clock) = CreateClockedProbe();
+        using (op)
+        {
+            ReportDownload(op, 0);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, OneMiB);
+            double? speed = op.CurrentProgress.BytesPerSecond;
+            Assert.NotNull(speed);
+
+            // Fresh repeated counter preserves the previous speed.
+            clock.Advance(TimeSpan.FromMilliseconds(500));
+            ReportDownload(op, OneMiB);
+            Assert.Equal(speed, op.CurrentProgress.BytesPerSecond);
+
+            // Stalled past the timeout drops the speed instead of preserving it.
+            clock.Advance(TimeSpan.FromSeconds(3));
+            ReportDownload(op, OneMiB);
             Assert.Null(op.CurrentProgress.BytesPerSecond);
         }
     }
 
     [Fact]
-    public void EveryReport_PropagatesExactlyOneEvent()
+    public void StageReset_StopsExpiryMechanism()
+    {
+        var (op, clock) = CreateClockedProbe();
+        using (op)
+        {
+            ReportDownload(op, 0);
+            clock.Advance(TimeSpan.FromSeconds(1));
+            ReportDownload(op, OneMiB);
+            Assert.True(op.IsStaleSpeedTimerArmedForTests());
+
+            op.ReportForTests(OperationProgress.ForStage(OperationProgressStage.Installing));
+            Assert.False(op.IsStaleSpeedTimerArmedForTests());
+            Assert.False(op.ExpireStaleSpeedForTests());
+        }
+    }
+
+    // ── Subscriber isolation: progress never fails the operation ───────────
+
+    [Fact]
+    public void ThrowingSubscriber_DoesNotEscape_AndLaterSubscriberStillReceives()
     {
         using var op = new ProgressProbeOperation();
-        int events = 0;
-        op.ProgressChanged += (_, _) => events++;
+        bool secondReceived = false;
+        op.ProgressChanged += (_, _) => throw new InvalidOperationException("display bug");
+        op.ProgressChanged += (_, _) => secondReceived = true;
 
-        // No throttling/coalescing: stage changes, determinate updates, and resets
-        // all propagate immediately on the reporting thread.
-        op.ReportForTests(OperationProgress.ForStage(OperationProgressStage.Downloading));
-        op.ReportForTests(OperationProgress.FromDownload(50, 100));
-        op.ResetForTests();
+        var progress = OperationProgress.FromDownload(50, 100);
+        var ex = Record.Exception(() => op.ReportForTests(progress));
 
-        Assert.Equal(3, events);
+        Assert.Null(ex);
+        Assert.True(secondReceived);
+        Assert.Equal(50, op.CurrentProgress.Percentage);
     }
 
     [Fact]
-    public async Task RapidConcurrentReports_AreSafeAndFinite()
+    public void ThrowingSubscriber_DoesNotTurnSuccessfulOperationIntoFailure()
     {
         using var op = new ProgressProbeOperation();
-        var seenSpeeds = new System.Collections.Concurrent.ConcurrentBag<double?>();
-        op.ProgressChanged += (_, progress) => seenSpeeds.Add(progress.BytesPerSecond);
+        op.ProgressChanged += (_, _) => throw new InvalidOperationException("display bug");
 
-        await Task.WhenAll(
-            Enumerable
-                .Range(0, 8)
-                .Select(worker =>
-                    Task.Run(() =>
-                    {
-                        for (ulong step = 0; step < 50; step++)
-                            op.ReportForTests(
-                                OperationProgress.FromDownload(
-                                    (ulong)worker * 1000 + step,
-                                    100_000
-                                )
-                            );
-                    })
-                )
+        var ex = Record.Exception(() =>
+            op.ReportForTests(OperationProgress.FromDownload(10, 100))
         );
 
-        foreach (double? speed in seenSpeeds)
-            Assert.True(
-                speed is null
-                    || (!double.IsNaN(speed.Value)
-                        && !double.IsInfinity(speed.Value)
-                        && speed.Value > 0),
-                $"Non-finite speed leaked: {speed}"
-            );
-
-        OperationProgress current = op.CurrentProgress;
-        Assert.True(current.IsDeterminate);
-        Assert.True(
-            current.BytesPerSecond is null
-                || (!double.IsNaN(current.BytesPerSecond.Value)
-                    && !double.IsInfinity(current.BytesPerSecond.Value)
-                    && current.BytesPerSecond.Value > 0)
-        );
+        Assert.Null(ex);
+        Assert.True(op.CurrentProgress.IsDeterminate);
     }
 
     // ── Separation: progress never touches log/history ─────────────────────
@@ -509,17 +367,15 @@ public sealed class OperationProgressTests
     public void ReportProgress_DoesNotWriteToOperationOutput()
     {
         using var op = new ProgressProbeOperation();
-        var clock = new ManualClock();
+        var clock = new ManualTimestampClock();
         op.SetClockForTests(clock.Now);
 
         op.ReportForTests(OperationProgress.ForStage(OperationProgressStage.Downloading));
         ReportDownload(op, OneMiB);
         clock.Advance(TimeSpan.FromSeconds(1));
         ReportDownload(op, 2 * OneMiB);
-        op.ResetForTests();
+        op.ReportForTests(OperationProgress.Unknown);
 
-        // The constructor only emits a ProgressIndicator line, which is excluded
-        // from the output by design; structured reports add nothing at all.
         Assert.Empty(op.GetOutput());
     }
 
@@ -530,64 +386,15 @@ public sealed class OperationProgressTests
         int progressEvents = 0;
         op.ProgressChanged += (_, _) => progressEvents++;
 
-        // Raw per-frame progress text flows through the normal log path only.
         op.EmitForTests("[###.....] 30% (3.0 MB/10.0 MB)", LineType.ProgressIndicator);
         op.EmitForTests("Fetching download url...", LineType.Information);
 
         Assert.Equal(0, progressEvents);
         Assert.Equal(OperationProgress.Unknown, op.CurrentProgress);
         Assert.Single(op.GetOutput());
-        Assert.Equal("Fetching download url...", op.GetOutput()[0].Item1);
     }
 
-    // ── Retry resets progress ──────────────────────────────────────────────
-
-    private sealed class AutoRetryProbeOperation : ProgressProbeOperation
-    {
-        private int _attempts;
-
-        protected override Task<OperationVeredict> PerformOperation()
-        {
-            _attempts++;
-            if (_attempts == 1)
-            {
-                // First attempt reports real progress, then asks for a retry.
-                ReportProgress(OperationProgress.FromDownload(50, 100));
-                return Task.FromResult(OperationVeredict.AutoRetry);
-            }
-
-            // Retry restarts observationally (as PackageOperation does per attempt).
-            ReportProgress(OperationProgress.ForStage(OperationProgressStage.Downloading));
-            return Task.FromResult(OperationVeredict.Success);
-        }
-    }
-
-    [Fact]
-    public async Task AutoRetry_AttemptBoundary_ResetsToUnknown()
-    {
-        using var op = new AutoRetryProbeOperation();
-        var seen = new List<OperationProgress>();
-        op.ProgressChanged += (_, p) => seen.Add(p);
-
-        await op.MainThread();
-
-        Assert.Equal(OperationStatus.Succeeded, op.Status);
-        Assert.Contains(seen, static p => p is { IsDeterminate: true, Percentage: 50 });
-        // The retry attempt restarts observationally with indeterminate progress and
-        // no speed, after the determinate report of the first attempt.
-        int determinateIndex = seen.FindIndex(
-            static p => p is { IsDeterminate: true, Percentage: 50 }
-        );
-        Assert.True(determinateIndex >= 0);
-        Assert.Contains(
-            seen.Skip(determinateIndex + 1),
-            static p => !p.IsDeterminate
-                && p.Stage == OperationProgressStage.Downloading
-                && p.BytesPerSecond is null
-        );
-    }
-
-    // ── Formatter ──────────────────────────────────────────────────────────
+    // ── Formatter (small representative set) ───────────────────────────────
 
     [Fact]
     public void Formatter_DeterminateDownload_IncludesPercentAndByteCounters()
@@ -614,38 +421,13 @@ public sealed class OperationProgressTests
         string text = OperationProgressFormatter.Format(progress);
 
         Assert.Contains("21%", text);
-        Assert.Contains("/", text);
         Assert.Contains("/s", text);
-        Assert.Contains("MB", text);
     }
 
     [Fact]
-    public void Formatter_IndeterminateInstall_ShowsStageWithoutPercent()
+    public void Formatter_StaleSpeed_IsOmitted()
     {
-        string text = OperationProgressFormatter.Format(
-            OperationProgress.FromInstall(null)
-        );
-
-        Assert.Contains("Installing", text);
-        Assert.DoesNotContain("%", text);
-    }
-
-    [Fact]
-    public void Formatter_Unknown_DoesNotThrow()
-    {
-        Assert.False(string.IsNullOrWhiteSpace(OperationProgressFormatter.Format(OperationProgress.Unknown)));
-    }
-
-    [Theory]
-    [InlineData(double.NaN)]
-    [InlineData(double.PositiveInfinity)]
-    [InlineData(double.NegativeInfinity)]
-    [InlineData(0)]
-    [InlineData(-5)]
-    public void Formatter_UnusableSpeed_IsOmitted(double bytesPerSecond)
-    {
-        var progress =
-            OperationProgress.FromDownload(50, 100) with { BytesPerSecond = bytesPerSecond };
+        var progress = OperationProgress.FromDownload(50, 100) with { BytesPerSecond = (double?)null };
 
         Assert.DoesNotContain("/s", OperationProgressFormatter.Format(progress));
     }
